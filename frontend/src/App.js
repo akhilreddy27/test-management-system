@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Dashboard from './components/dashboard';
+import Setup from './components/setup';
 import { testCasesAPI } from './services/api';
 
 function App() {
@@ -131,12 +132,11 @@ function App() {
           />
         )}
         {currentView === 'setup' && (
-          <div className="max-w-4xl mx-auto p-6">
-            <div className="bg-white rounded-lg shadow-lg p-8 text-center">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">⚙️ Setup Coming Soon</h2>
-              <p className="text-gray-600">Site configuration interface will be added next!</p>
-            </div>
-          </div>
+          <Setup 
+            testCases={testCases}
+            availableCellTypes={availableCellTypes}
+            currentUser={currentUser}
+          />
         )}
         {currentView === 'testing' && (
           <div className="max-w-4xl mx-auto p-6">
