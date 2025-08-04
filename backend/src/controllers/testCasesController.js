@@ -17,6 +17,23 @@ class TestCasesController {
       });
     }
   }
+
+  async getCellTypes(req, res) {
+    try {
+      const testCases = excelService.readTestCases();
+      const cellTypes = [...new Set(testCases.map(tc => tc.cellType))];
+      res.json({
+        success: true,
+        data: cellTypes
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Error getting cell types',
+        error: error.message
+      });
+    }
+  }
 }
 
 module.exports = new TestCasesController();
