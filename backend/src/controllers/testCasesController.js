@@ -137,7 +137,8 @@ class TestCasesController {
           if (existingEntry) {
             mappedTestCases.push({
               ...tc,
-              testId: existingEntry.testId, // Use the actual testId from test_status.xlsx
+              testId: existingEntry.testId, // Original test ID
+              uniqueTestId: existingEntry.uniqueTestId, // Unique test ID for matching
               status: existingEntry.status,
               cell: 'SYSTEM',
               phase: tc.phase,
@@ -186,7 +187,8 @@ class TestCasesController {
                   phase: tc.phase,
                   lastModified: existingEntry.lastModified,
                   modifiedUser: existingEntry.modifiedUser,
-                  testId: existingEntry.testId,
+                  testId: existingEntry.testId, // Original test ID
+                  uniqueTestId: existingEntry.uniqueTestId, // Unique test ID for matching
                   scope: tc.scope,
                   // Add CH/VT data
                   chVolume: existingEntry.chVolume || '',
@@ -253,6 +255,69 @@ class TestCasesController {
     }
   }
 
+  async getTestCaseConfigurations(req, res) {
+    try {
+      const testCases = await excelService.readTestCases();
+      
+      // Create dynamic configurations based on test case patterns
+      const configurations = {};
+      
+      testCases.forEach(testCase => {
+        const testCaseName = testCase.testCase;
+        
+        // Skip if already configured
+        if (configurations[testCaseName]) return;
+        
+        const config = {
+          hasDataEntry: false,
+          fields: [],
+          statusRequired: true,
+          fieldMappings: {}
+        };
+        
+        // Dynamic detection based on test case name patterns
+        if (testCaseName.includes('Cell Hardening')) {
+          config.hasDataEntry = true;
+          config.fields = [
+            { name: 'volume', label: 'CH Volume', type: 'number', placeholder: 'CH Volume' },
+            { name: 'date', label: 'Date', type: 'date' }
+          ];
+          config.statusRequired = false;
+          config.fieldMappings = {
+            volume: 'productionNumber', // Maps to CH Volume in backend
+            date: 'date' // Maps to CH Date in backend
+          };
+        } else if (testCaseName.includes('Volume Test')) {
+          config.hasDataEntry = true;
+          config.fields = [
+            { name: 'volume', label: 'VT Volume', type: 'number', placeholder: 'VT Volume' },
+            { name: 'startDateTime', label: 'Start', type: 'datetime-local' },
+            { name: 'endDateTime', label: 'End', type: 'datetime-local' }
+          ];
+          config.statusRequired = true;
+          config.fieldMappings = {
+            volume: 'volume', // Maps to VT Volume in backend
+            startDateTime: 'startDateTime', // Maps to VT Start DateTime in backend
+            endDateTime: 'endDateTime' // Maps to VT End DateTime in backend
+          };
+        }
+        
+        configurations[testCaseName] = config;
+      });
+      
+      res.json({
+        success: true,
+        data: configurations
+      });
+    } catch (error) {
+      console.error('Error getting test case configurations:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get test case configurations',
+        error: error.message
+      });
+    }
+  }
 
 }
 

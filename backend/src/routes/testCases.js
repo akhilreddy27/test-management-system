@@ -14,4 +14,6 @@ router.get('/cell-types', testCasesController.getCellTypes);
 // GET /api/test-cases/sites - Get available sites
 router.get('/sites', testCasesController.getSites);
 
+router.get('/configurations', testCasesController.getTestCaseConfigurations);
+
 module.exports = router;

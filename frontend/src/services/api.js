@@ -15,6 +15,7 @@ export const testCasesAPI = {
   getBySite: (site) => api.get(`/test-cases/site/${site}`),
   getCellTypes: () => api.get('/test-cases/cell-types'),
   getSites: () => api.get('/test-cases/sites'),
+  getConfigurations: () => api.get(`${API_BASE_URL}/test-cases/configurations`)
 };
 
 // Test Status API

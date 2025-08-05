@@ -56,7 +56,8 @@ class ExcelService {
         cellType: row['Cell Type'],
         cell: row['Cell'],
         testCase: row['Test Case'],
-        testId: row['Test ID'],
+        testId: row['Test ID'], // Original test ID
+        uniqueTestId: row['Unique Test ID'] || '', // New unique test ID
         scope: row['Scope'],
         status: row['Status'] || 'NOT RUN',
         lastModified: row['Last modified'],
@@ -88,7 +89,8 @@ class ExcelService {
         'Cell Type': entry.cellType,
         'Cell': entry.cell,
         'Test Case': entry.testCase,
-        'Test ID': entry.testId || '',
+        'Test ID': entry.testId || '', // Original test ID
+        'Unique Test ID': entry.uniqueTestId || '', // New unique test ID
         'Scope': entry.scope || '',
         'Status': entry.status,
         'Last modified': entry.lastModified ? new Date(entry.lastModified).toLocaleString() : '',

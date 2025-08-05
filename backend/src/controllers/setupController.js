@@ -39,13 +39,17 @@ class SetupController {
         
         cellIds.forEach(cellId => {
           relevantTestCases.forEach(testCase => {
+            // Generate unique ID: {site}_{phase}_{cellName}_{testId}
+            const uniqueTestId = `${siteName}_${phase}_${cellId}_${testCase.testId}`.replace(/\s+/g, '_');
+            
             newStatusEntries.push({
               site: siteName,
               phase: phase,
               cellType: type,
               cell: cellId,
               testCase: testCase.testCase,
-              testId: testCase.testId,
+              testId: testCase.testId, // Keep original test ID
+              uniqueTestId: uniqueTestId, // Add unique test ID
               scope: testCase.scope,
               status: 'NOT RUN',
               lastModified: new Date().toISOString(),
@@ -68,13 +72,17 @@ class SetupController {
       console.log(`Found ${systemTestCases.length} system test cases for configured cell types`);
       
       systemTestCases.forEach(testCase => {
+        // Generate unique ID for system test cases: {site}_{phase}_SYSTEM_{testId}
+        const uniqueTestId = `${siteName}_${phase}_SYSTEM_${testCase.testId}`.replace(/\s+/g, '_');
+        
         newStatusEntries.push({
           site: siteName,
           phase: phase,
           cellType: testCase.cellType,
           cell: 'SYSTEM',
           testCase: testCase.testCase,
-          testId: testCase.testId,
+          testId: testCase.testId, // Keep original test ID
+          uniqueTestId: uniqueTestId, // Add unique test ID
           scope: testCase.scope,
           status: 'NOT RUN',
           lastModified: new Date().toISOString(),

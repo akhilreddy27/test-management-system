@@ -6,13 +6,12 @@ import Testing from './components/testing';
 import './App.css';
 
 function App() {
-  const [currentView, setCurrentView] = useState('dashboard');
+  const [currentView, setCurrentView] = useState('testing');
   const [testCases, setTestCases] = useState([]);
   const [availableCellTypes, setAvailableCellTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [currentUser, setCurrentUser] = useState('Test Engineer');
-  const [userInput, setUserInput] = useState('');
+  const [currentUser, setCurrentUser] = useState('Automation Engineer');
 
   useEffect(() => {
     loadInitialData();
@@ -36,17 +35,10 @@ function App() {
     }
   };
 
-  const handleUserSubmit = () => {
-    if (userInput.trim()) {
-      setCurrentUser(userInput.trim());
-      setUserInput('');
-    }
-  };
-
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: '📊', color: 'from-blue-500 to-blue-600' },
-    { id: 'testing', label: 'Testing', icon: '✅', color: 'from-green-500 to-green-600' },
-    { id: 'setup', label: 'Setup', icon: '⚙️', color: 'from-yellow-500 to-yellow-600' }
+    { id: 'dashboard', label: 'Dashboard', icon: '📊', color: 'from-blue-500 to-blue-600', disabled: true },
+    { id: 'testing', label: 'Testing', icon: '✅', color: 'from-green-500 to-green-600', disabled: false },
+    { id: 'setup', label: 'Setup', icon: '⚙️', color: 'from-yellow-500 to-yellow-600', disabled: false }
   ];
 
   const getCurrentNavItem = () => navItems.find(item => item.id === currentView);
@@ -111,16 +103,22 @@ function App() {
             {navItems.map((item) => (
               <button
                 key={item.id}
-                onClick={() => setCurrentView(item.id)}
+                onClick={() => !item.disabled && setCurrentView(item.id)}
+                disabled={item.disabled}
                 className={`w-full flex items-center space-x-3 p-3 rounded-lg transition-all duration-300 font-medium text-left ${
-                  currentView === item.id
+                  item.disabled
+                    ? 'text-gray-400 bg-gray-50 cursor-not-allowed opacity-50'
+                    : currentView === item.id
                     ? `bg-gradient-to-r ${item.color} text-white shadow-md`
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 <span className="text-lg">{item.icon}</span>
                 <span className="text-sm">{item.label}</span>
-                {currentView === item.id && (
+                {item.disabled && (
+                  <span className="ml-auto text-xs text-gray-400">(Work in Progress)</span>
+                )}
+                {currentView === item.id && !item.disabled && (
                   <div className="ml-auto w-2 h-2 bg-white rounded-full"></div>
                 )}
               </button>
@@ -142,22 +140,9 @@ function App() {
             </div>
             
             <div className="flex items-center space-x-4">
-              {/* User Input */}
+              {/* User display - will be automatically populated later */}
               <div className="flex items-center space-x-3">
-                <input
-                  type="text"
-                  value={userInput}
-                  onChange={(e) => setUserInput(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleUserSubmit()}
-                  placeholder="Enter your name..."
-                  className="px-4 py-2 border-2 border-gray-200 rounded-xl focus:border-[#0053E2] focus:ring-2 focus:ring-[#0053E2]/20 transition-all duration-300"
-                />
-                <button
-                  onClick={handleUserSubmit}
-                  className="px-4 py-2 bg-[#0053E2] text-white rounded-xl hover:bg-[#0040B0] transition-all duration-300 font-semibold"
-                >
-                  Set User
-                </button>
+                <span className="text-gray-600 text-sm">User: {currentUser}</span>
               </div>
             </div>
           </div>

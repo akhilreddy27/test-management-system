@@ -21,6 +21,7 @@ const Testing = ({ currentUser }) => {
   const [chVtData, setChVtData] = useState({});
 
   useEffect(() => {
+    loadTestCaseConfigurations();
     loadSites();
   }, []);
 
@@ -44,6 +45,16 @@ const Testing = ({ currentUser }) => {
     }
   };
 
+  const loadTestCaseConfigurations = async () => {
+    try {
+      const response = await testCasesAPI.getConfigurations();
+      setTestCaseConfigs(response.data.data);
+    } catch (error) {
+      console.error('Error loading test case configurations:', error);
+      // Don't set error state as this is not critical for basic functionality
+    }
+  };
+
   const loadTestCasesForSite = async (site) => {
     try {
       setLoading(true);
@@ -52,16 +63,24 @@ const Testing = ({ currentUser }) => {
       const response = await testCasesAPI.getBySite(site);
       setTestCases(response.data.data);
       
-      // Load current CH/VT data from the backend
+      // Load current data from the backend dynamically
       const chVtDataFromBackend = {};
       response.data.data.forEach(testCase => {
-        if (testCase.testCase.includes('Cell Hardening') || testCase.testCase.includes('Volume Test')) {
-          chVtDataFromBackend[testCase.testId] = {
-            volume: testCase.chVolume || testCase.vtVolume || '',
-            date: testCase.chDate || '',
-            startDateTime: testCase.vtStartDateTime || '',
-            endDateTime: testCase.vtEndDateTime || ''
-          };
+        const config = getTestCaseConfig(testCase);
+        if (config.hasDataEntry) {
+          const key = testCase.uniqueTestId || testCase.testId;
+          const data = {};
+          
+          // Map backend fields to frontend fields based on configuration
+          const config = getTestCaseConfig(testCase);
+          config.fields.forEach(fieldConfig => {
+            const backendField = getFieldMapping(testCase, fieldConfig.name);
+            if (backendField) {
+              data[fieldConfig.name] = testCase[backendField] || '';
+            }
+          });
+          
+          chVtDataFromBackend[key] = data;
         }
       });
       setChVtData(chVtDataFromBackend);
@@ -80,7 +99,7 @@ const Testing = ({ currentUser }) => {
   const updateTestStatus = async (testId, status) => {
     try {
       // Find the test case to get cell information
-      const testCase = testCases.find(tc => tc.testId === testId);
+      const testCase = testCases.find(tc => tc.uniqueTestId === testId || tc.testId === testId);
       if (!testCase) {
         console.error('Test case not found for testId:', testId);
         return;
@@ -93,7 +112,7 @@ const Testing = ({ currentUser }) => {
       }
 
       const response = await testStatusAPI.update({
-        testId,
+        testId: testCase.uniqueTestId || testId, // Use unique test ID if available
         cell: testCase.cell, // Add cell information for uniqueness
         cellType: testCase.cellType, // Add cell type for uniqueness
         site: selectedSite, // Add site for uniqueness
@@ -104,7 +123,7 @@ const Testing = ({ currentUser }) => {
 
       if (response.data.success) {
         setTestCases(prev => prev.map(tc => 
-          tc.testId === testId 
+          (tc.uniqueTestId === testId || tc.testId === testId)
             ? { ...tc, status, lastModified: new Date().toISOString(), modifiedUser: currentUser }
             : tc
         ));
@@ -119,71 +138,97 @@ const Testing = ({ currentUser }) => {
     updateTestStatus(testId, newStatus);
   };
 
+  // Dynamic test case configuration from backend
+  const [testCaseConfigs, setTestCaseConfigs] = useState({});
+
+  const getTestCaseConfig = (testCase) => {
+    return testCaseConfigs[testCase.testCase] || {
+      hasDataEntry: false,
+      fields: [],
+      statusRequired: true,
+      fieldMappings: {}
+    };
+  };
+
+  const hasDataEntryFields = (testCase) => {
+    return getTestCaseConfig(testCase).hasDataEntry;
+  };
+
+  const getDataEntryFields = (testCase) => {
+    return getTestCaseConfig(testCase).fields;
+  };
+
+  const getFieldMapping = (testCase, fieldName) => {
+    const config = getTestCaseConfig(testCase);
+    return config.fieldMappings?.[fieldName] || fieldName;
+  };
+
   const handleChVtDataChange = async (testId, field, value) => {
-    // Update local state
+    // Find the test case to determine its type and get unique test ID
+    const testCase = testCases.find(tc => tc.uniqueTestId === testId || tc.testId === testId);
+    if (!testCase) {
+      console.error('Test case not found for testId:', testId);
+      return;
+    }
+    
+    // Debug: Check if cell property exists
+    if (!testCase.cell) {
+      console.error('Cell property not found in test case:', testCase);
+      return;
+    }
+
+    // Use unique test ID as the key for chVtData
+    const uniqueKey = testCase.uniqueTestId || testId;
+    
+    // Update local state using unique key
     setChVtData(prev => ({
       ...prev,
-      [testId]: {
-        ...prev[testId],
+      [uniqueKey]: {
+        ...prev[uniqueKey],
         [field]: value
       }
     }));
 
     // Also update the backend
     try {
-      // Find the test case to determine its type
-      const testCase = testCases.find(tc => tc.testId === testId);
-      if (!testCase) {
-        console.error('Test case not found for testId:', testId);
-        return;
-      }
-      
-      // Debug: Check if cell property exists
-      if (!testCase.cell) {
-        console.error('Cell property not found in test case:', testCase);
-        return;
-      }
-
-      // Get current data for this test case
-      const currentData = chVtData[testId] || {};
+      // Get current data for this test case using unique key
+      const currentData = chVtData[uniqueKey] || {};
       const updatedData = { ...currentData, [field]: value };
 
-      // Determine if we have any actual data
+      // Dynamic data validation based on test case type
+      const config = getTestCaseConfig(testCase);
       let hasData = false;
-      if (testCase.testCase.includes('Cell Hardening')) {
-        hasData = (updatedData.volume && updatedData.volume.trim() !== '') || 
-                  (updatedData.date && updatedData.date.trim() !== '');
-      } else if (testCase.testCase.includes('Volume Test')) {
-        hasData = (updatedData.volume && updatedData.volume.trim() !== '') || 
-                  (updatedData.startDateTime && updatedData.startDateTime.trim() !== '') ||
-                  (updatedData.endDateTime && updatedData.endDateTime.trim() !== '');
+      
+      if (config.hasDataEntry) {
+        hasData = config.fields.some(fieldConfig => {
+          const fieldValue = updatedData[fieldConfig.name];
+          return fieldValue && fieldValue.toString().trim() !== '';
+        });
       }
 
       const updateData = {
-        testId: testId,
+        testId: testCase.uniqueTestId || testId, // Use unique test ID if available
         cell: testCase.cell, // Add cell information for uniqueness
         cellType: testCase.cellType, // Add cell type for uniqueness
         site: selectedSite, // Add site for uniqueness
-        status: hasData ? 'DATA_ENTRY' : 'NOT RUN', // Only set DATA_ENTRY if we have actual data
         lastModified: new Date().toISOString(),
         modifiedUser: currentUser
       };
 
-      // Map fields based on test case type
+      // Only update status automatically for Cell Hardening (which doesn't have status dropdown)
+      // For Volume Test, preserve the current status from the dropdown
       if (testCase.testCase.includes('Cell Hardening')) {
-        if (field === 'volume') {
-          updateData.productionNumber = value; // This will be saved to CH Volume
-        } else if (field === 'date') {
-          updateData.date = value; // This will be saved to CH Date
-        }
+        updateData.status = hasData ? 'DATA_ENTRY' : 'NOT RUN';
       } else if (testCase.testCase.includes('Volume Test')) {
-        if (field === 'volume') {
-          updateData.volume = value; // This will be saved to VT Volume
-        } else if (field === 'startDateTime') {
-          updateData.startDateTime = value; // This will be saved to VT Start
-        } else if (field === 'endDateTime') {
-          updateData.endDateTime = value; // This will be saved to VT End
-        }
+        // For Volume Test, preserve the current status from the dropdown
+        updateData.status = testCase.status || 'NOT RUN';
+      }
+
+      // Dynamic field mapping based on configuration
+      const testConfig = getTestCaseConfig(testCase);
+      const backendField = getFieldMapping(testCase, field);
+      if (backendField) {
+        updateData[backendField] = value;
       }
 
       await testStatusAPI.update(updateData);
@@ -303,6 +348,73 @@ const Testing = ({ currentUser }) => {
     }
   };
 
+  // Automatic scope color assignment system
+  const [dynamicScopeColors, setDynamicScopeColors] = useState({});
+  
+  // Predefined color palette for automatic assignment
+  const colorPalette = [
+    { bg: 'bg-blue-50', badge: 'bg-blue-100 text-blue-800' },
+    { bg: 'bg-green-50', badge: 'bg-green-100 text-green-800' },
+    { bg: 'bg-red-50', badge: 'bg-red-100 text-red-800' },
+    { bg: 'bg-yellow-50', badge: 'bg-yellow-100 text-yellow-800' },
+    { bg: 'bg-purple-50', badge: 'bg-purple-100 text-purple-800' },
+    { bg: 'bg-indigo-50', badge: 'bg-indigo-100 text-indigo-800' },
+    { bg: 'bg-pink-50', badge: 'bg-pink-100 text-pink-800' },
+    { bg: 'bg-orange-50', badge: 'bg-orange-100 text-orange-800' },
+    { bg: 'bg-teal-50', badge: 'bg-teal-100 text-teal-800' },
+    { bg: 'bg-cyan-50', badge: 'bg-cyan-100 text-cyan-800' },
+    { bg: 'bg-emerald-50', badge: 'bg-emerald-100 text-emerald-800' },
+    { bg: 'bg-amber-50', badge: 'bg-amber-100 text-amber-800' },
+    { bg: 'bg-lime-50', badge: 'bg-lime-100 text-lime-800' },
+    { bg: 'bg-rose-50', badge: 'bg-rose-100 text-rose-800' },
+    { bg: 'bg-violet-50', badge: 'bg-violet-100 text-violet-800' },
+    { bg: 'bg-sky-50', badge: 'bg-sky-100 text-sky-800' },
+    { bg: 'bg-slate-50', badge: 'bg-slate-100 text-slate-800' },
+    { bg: 'bg-zinc-50', badge: 'bg-zinc-100 text-zinc-800' },
+    { bg: 'bg-neutral-50', badge: 'bg-neutral-100 text-neutral-800' },
+    { bg: 'bg-stone-50', badge: 'bg-stone-100 text-stone-800' }
+  ];
+
+  // Function to automatically assign colors to new scopes
+  const assignScopeColor = (scope) => {
+    if (!scope) return { bg: 'bg-gray-50', badge: 'bg-gray-100 text-gray-800' };
+    
+    // If scope already has a color assigned, return it
+    if (dynamicScopeColors[scope]) {
+      return dynamicScopeColors[scope];
+    }
+    
+    // Get all unique scopes from current test cases
+    const allScopes = [...new Set(testCases.map(tc => tc.scope).filter(Boolean))];
+    
+    // Find the index of this scope in the unique scopes list
+    const scopeIndex = allScopes.indexOf(scope);
+    
+    // Assign color from palette based on scope index
+    const colorIndex = scopeIndex % colorPalette.length;
+    const assignedColor = colorPalette[colorIndex];
+    
+    // Store the assigned color
+    setDynamicScopeColors(prev => ({
+      ...prev,
+      [scope]: assignedColor
+    }));
+    
+    console.log(`🎨 Automatically assigned color to new scope: "${scope}" - ${assignedColor.bg}`);
+    
+    return assignedColor;
+  };
+
+  const getScopeBackgroundColor = (scope) => {
+    const color = assignScopeColor(scope);
+    return color.bg;
+  };
+
+  const getScopeBadgeColor = (scope) => {
+    const color = assignScopeColor(scope);
+    return color.badge;
+  };
+
   // Group test cases by scope and cell type
   const groupedTestCases = testCases.reduce((groups, testCase) => {
     const scope = testCase.scope || 'Cell';
@@ -370,6 +482,24 @@ const Testing = ({ currentUser }) => {
     }));
   };
 
+  const refreshAll = async () => {
+    try {
+      setLoading(true);
+      // Load configurations first
+      await loadTestCaseConfigurations();
+      // Refresh sites
+      await loadSites();
+      // Then refresh test cases if a site is selected
+      if (selectedSite) {
+        await loadTestCasesForSite(selectedSite);
+      }
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Site Selection */}
@@ -379,17 +509,19 @@ const Testing = ({ currentUser }) => {
             <h2 className="text-lg font-semibold text-gray-900 mb-1">Functional Testing</h2>
           </div>
           <div className="flex space-x-2">
-          <button
-            onClick={loadSites}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
-          >
-            Refresh Sites
-          </button>
             <button
-              onClick={() => selectedSite && loadTestCasesForSite(selectedSite)}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm font-medium"
+              onClick={refreshAll}
+              disabled={loading}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
             >
-              Refresh Test Cases
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>Refreshing...</span>
+                </>
+              ) : (
+                <span>Refresh</span>
+              )}
             </button>
           </div>
         </div>
@@ -547,11 +679,16 @@ const Testing = ({ currentUser }) => {
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {group.testCases.map((testCase, index) => (
-                          <tr key={testCase.testId} className="hover:bg-gray-50">
+                          <tr key={testCase.testId} className={`hover:bg-gray-100 ${getScopeBackgroundColor(testCase.scope)}`}>
                             <td className="px-6 py-4">
                               <div>
-                                <div className="font-medium text-gray-900">{testCase.testCase}</div>
-                                <div className="text-sm text-gray-500">{testCase.scope} • {testCase.phase}</div>
+                                <div className="font-medium text-gray-900 flex items-center space-x-2">
+                                  <span>{testCase.testCase}</span>
+                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getScopeBadgeColor(testCase.scope)}`}>
+                                    {testCase.scope}
+                                  </span>
+                                </div>
+                                <div className="text-sm text-gray-500">{testCase.phase}</div>
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -560,9 +697,7 @@ const Testing = ({ currentUser }) => {
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              {testCase.testCase.includes('Cell Hardening') ? (
-                                <span className="text-gray-400 text-xs">—</span>
-                              ) : (
+                              {getTestCaseConfig(testCase).statusRequired ? (
                                 <select
                                   value={testCase.status}
                                   onChange={(e) => handleStatusChange(testCase.testId, e.target.value)}
@@ -578,70 +713,34 @@ const Testing = ({ currentUser }) => {
                                   <option value="FAIL">❌ FAIL</option>
                                   <option value="BLOCKED">🚫 BLOCKED</option>
                                 </select>
+                              ) : (
+                                <span className="text-gray-400 text-xs">—</span>
                               )}
                             </td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm">
-                              {testCase.testCase.includes('Cell Hardening') ? (
-                                // Data entry fields for Cell Hardening test cases
+                              {hasDataEntryFields(testCase) ? (
+                                // Dynamic data entry fields based on test case configuration
                                 <div className="flex space-x-2">
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      CH Volume
-                                    </label>
-                                    <input
-                                      type="number"
-                                      placeholder="CH Volume"
-                                      value={chVtData[testCase.testId]?.volume || ''}
-                                      onChange={(e) => handleChVtDataChange(testCase.testId, 'volume', e.target.value)}
-                                      className="w-20 px-2 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500"
-                                      min="0"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
-                                    <input
-                                      type="date"
-                                      value={chVtData[testCase.testId]?.date || ''}
-                                      onChange={(e) => handleChVtDataChange(testCase.testId, 'date', e.target.value)}
-                                      className="w-28 px-2 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500"
-                                    />
-                                  </div>
+                                  {getDataEntryFields(testCase).map((fieldConfig, index) => (
+                                    <div key={index}>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        {fieldConfig.label}
+                                      </label>
+                                      <input
+                                        type={fieldConfig.type}
+                                        placeholder={fieldConfig.placeholder || fieldConfig.label}
+                                        value={chVtData[testCase.uniqueTestId || testCase.testId]?.[fieldConfig.name] || ''}
+                                        onChange={(e) => handleChVtDataChange(testCase.uniqueTestId || testCase.testId, fieldConfig.name, e.target.value)}
+                                        className={`px-2 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500 ${
+                                          fieldConfig.type === 'datetime-local' ? 'w-40' : 
+                                          fieldConfig.type === 'date' ? 'w-28' : 
+                                          fieldConfig.type === 'number' ? 'w-24' : 'w-20'
+                                        }`}
+                                        min={fieldConfig.type === 'number' ? '0' : undefined}
+                                      />
+                                    </div>
+                                  ))}
                                 </div>
-                              ) : testCase.testCase.includes('Volume Test') ? (
-                                // Data entry fields for Volume Test cases
-                                <div className="flex space-x-3">
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      VT Volume
-                                    </label>
-                                    <input
-                                      type="number"
-                                      placeholder="VT Volume"
-                                      value={chVtData[testCase.testId]?.volume || ''}
-                                      onChange={(e) => handleChVtDataChange(testCase.testId, 'volume', e.target.value)}
-                                      className="w-24 px-2 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500"
-                                      min="0"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Start</label>
-                                    <input
-                                      type="datetime-local"
-                                      value={chVtData[testCase.testId]?.startDateTime || ''}
-                                      onChange={(e) => handleChVtDataChange(testCase.testId, 'startDateTime', e.target.value)}
-                                      className="w-40 px-2 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">End</label>
-                                    <input
-                                      type="datetime-local"
-                                      value={chVtData[testCase.testId]?.endDateTime || ''}
-                                      onChange={(e) => handleChVtDataChange(testCase.testId, 'endDateTime', e.target.value)}
-                                      className="w-40 px-2 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500"
-                                    />
-                                  </div>
-                              </div>
                               ) : (
                                 // No actions for regular test cases - status is handled by dropdown
                                 <span className="text-gray-400 text-xs">—</span>

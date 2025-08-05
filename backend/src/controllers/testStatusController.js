@@ -51,30 +51,11 @@ class TestStatusController {
       // Find and update the specific test
       let updated = false;
       const updatedStatus = currentStatus.map(entry => {
-        // For Cell Hardening and Volume Test, we need to match by test case name and cell
-        // since the frontend uses original test IDs but backend has unique test IDs
+        // Use unique test ID for matching to ensure data isolation
         let shouldUpdate = false;
         
-        if (testId.startsWith('CH-') || testId.startsWith('VT-')) {
-          // For Cell Hardening and Volume Test, match by test case name, cell type, and cell
-          // Extract the test case number from the testId (e.g., CH-1001 -> Cell Hardening - 1)
-          let expectedTestCase = '';
-          if (testId.startsWith('CH-')) {
-            const testNumber = testId.replace('CH-', '');
-            expectedTestCase = `Cell Hardening - ${testNumber.slice(-1)}`; // Last digit is the day number
-          } else if (testId.startsWith('VT-')) {
-            expectedTestCase = 'Volume Test';
-          }
-          
-          shouldUpdate = entry.testCase && 
-                        entry.testCase === expectedTestCase &&
-                        entry.cellType === cellType &&
-                        entry.cell === cell &&
-                        entry.site === site;
-        } else {
-          // For regular test cases, use testId, cell type, cell, and site combination
-          shouldUpdate = entry.testId === testId && entry.cellType === cellType && entry.cell === cell && entry.site === site;
-        }
+        // The frontend should send the unique test ID directly
+        shouldUpdate = entry.uniqueTestId === testId;
         
         if (shouldUpdate) {
           console.log(`Updating entry: ${entry.testId} for cell: ${entry.cell}`);
