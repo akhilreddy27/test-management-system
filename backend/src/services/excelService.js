@@ -22,10 +22,11 @@ class ExcelService {
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
       
       return jsonData.map(row => ({
-        cellType: row['Each Cell Type'] || row['Cell Type'],
+        cellType: row['Cell Type'],
         testCase: row['Test Case'],
-        caseId: row['Case ID'],
-        scope: row['Scope']
+        testId: row['Test ID'],
+        scope: row['Scope'],
+        phase: row['Phase']
       }));
       
     } catch (error) {
@@ -55,10 +56,19 @@ class ExcelService {
         cellType: row['Cell Type'],
         cell: row['Cell'],
         testCase: row['Test Case'],
-        caseId: row['Case ID'],
+        testId: row['Test ID'],
+        scope: row['Scope'],
         status: row['Status'] || 'NOT RUN',
         lastModified: row['Last modified'],
-        modifiedUser: row['Modified User']
+        modifiedUser: row['Modified User'],
+        // Cell hardening columns (removed old 3-day columns)
+        // Volume Test columns
+        vtVolume: row['VT Volume'] || '',
+        vtStartDateTime: row['VT Start DateTime'] || '',
+        vtEndDateTime: row['VT End DateTime'] || '',
+        // Cell Hardening columns
+        chVolume: row['CH Volume'] || '',
+        chDate: row['CH Date'] || ''
       }));
       
     } catch (error) {
@@ -78,10 +88,19 @@ class ExcelService {
         'Cell Type': entry.cellType,
         'Cell': entry.cell,
         'Test Case': entry.testCase,
-        'Case ID': entry.caseId,
+        'Test ID': entry.testId || '',
+        'Scope': entry.scope || '',
         'Status': entry.status,
         'Last modified': entry.lastModified ? new Date(entry.lastModified).toLocaleString() : '',
-        'Modified User': entry.modifiedUser || ''
+        'Modified User': entry.modifiedUser || '',
+        // Cell hardening columns (removed old 3-day columns)
+        // Volume Test columns
+        'VT Volume': entry.vtVolume || '',
+        'VT Start DateTime': entry.vtStartDateTime || '',
+        'VT End DateTime': entry.vtEndDateTime || '',
+        // Cell Hardening columns
+        'CH Volume': entry.chVolume || '',
+        'CH Date': entry.chDate || ''
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(excelData);
@@ -95,6 +114,64 @@ class ExcelService {
     } catch (error) {
       console.error('Error writing test status:', error);
       throw error;
+    }
+  }
+
+  saveTestResults(resultsData) {
+    try {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const fileName = `test_results_${resultsData.site}_${timestamp}.xlsx`;
+      const filePath = path.join(this.dataPath, fileName);
+      
+      // Create Excel data with submission details
+      const excelData = [
+        // Header row with submission info
+        {
+          'Submission ID': resultsData.submissionId,
+          'Site': resultsData.site,
+          'Submitted By': resultsData.submittedBy,
+          'Submitted At': new Date(resultsData.submittedAt).toLocaleString(),
+          'Total Tests': resultsData.totalTests,
+          'Passed Tests': resultsData.passedTests,
+          'Pass Rate': `${Math.round((resultsData.passedTests / resultsData.totalTests) * 100)}%`
+        },
+        // Empty row for spacing
+        {},
+        // Results header
+        {
+          'Cell Type': 'Cell Type',
+          'Cell': 'Cell',
+          'Test Case': 'Test Case',
+          'Case ID': 'Case ID',
+          'Status': 'Status',
+          'Phase': 'Phase',
+          'Last Modified': 'Last Modified',
+          'Modified User': 'Modified User'
+        },
+        // Results data
+        ...resultsData.results.map(result => ({
+          'Cell Type': result.cellType,
+          'Cell': result.cell,
+          'Test Case': result.testCase,
+          'Case ID': result.caseId,
+          'Status': result.status,
+          'Phase': result.phase,
+          'Last Modified': result.lastModified ? new Date(result.lastModified).toLocaleString() : '',
+          'Modified User': result.modifiedUser || ''
+        }))
+      ];
+
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Test Results');
+      
+      XLSX.writeFile(workbook, filePath);
+      
+      console.log(`Test results saved to: ${fileName}`);
+      return true;
+    } catch (error) {
+      console.error('Error saving test results:', error);
+      return false;
     }
   }
 }

@@ -3,11 +3,12 @@ const cors = require('cors');
 const testCasesRoutes = require('./src/routes/testCases');
 const setupRoutes = require('./src/routes/setup');
 const testStatusRoutes = require('./src/routes/testStatus');
+const cellHardeningRoutes = require('./src/routes/cellHardening');
 
 console.log('Starting server...');
 
 const app = express();
-const PORT = 3001;
+const PORT = 3002;
 
 // Middleware
 app.use(cors());
@@ -19,6 +20,7 @@ console.log('Middleware configured...');
 app.use('/api/test-cases', testCasesRoutes);
 app.use('/api/setup', setupRoutes);
 app.use('/api/test-status', testStatusRoutes);
+app.use('/api/cell-hardening', cellHardeningRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {
@@ -36,4 +38,9 @@ app.listen(PORT, () => {
   console.log('- GET /api/test-status');
   console.log('- PUT /api/test-status');
   console.log('- GET /api/test-status/statistics');
+  console.log('- GET /api/cell-hardening');
+  console.log('- GET /api/cell-hardening/summary');
+  console.log('- POST /api/cell-hardening');
+  console.log('- PUT /api/cell-hardening/:site/:cellType/:cell/:day');
+  console.log('- DELETE /api/cell-hardening/:site/:cellType/:cell/:day');
 });

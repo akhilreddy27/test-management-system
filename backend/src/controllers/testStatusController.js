@@ -6,9 +6,9 @@ class TestStatusController {
     try {
       const testStatus = excelService.readTestStatus();
       
-      // Add unique IDs for frontend tracking
+      // Use the actual testId from the entry
       const testStatusWithIds = testStatus.map((entry, index) => ({
-        id: `${entry.site}_${entry.phase}_${entry.cell}_${entry.testCase}`.replace(/\s+/g, '_'),
+        testId: entry.testId,
         ...entry
       }));
       
@@ -34,7 +34,7 @@ class TestStatusController {
     console.log('Request body:', JSON.stringify(req.body, null, 2));
     
     try {
-      const { testId, status, lastModified, modifiedUser } = req.body;
+      const { testId, cell, cellType, site, status, lastModified, modifiedUser, day, date, productionNumber, notes, volume, startDateTime, endDateTime } = req.body;
       
       if (!testId) {
         return res.status(400).json({
@@ -51,18 +51,80 @@ class TestStatusController {
       // Find and update the specific test
       let updated = false;
       const updatedStatus = currentStatus.map(entry => {
-        const entryId = `${entry.site}_${entry.phase}_${entry.cell}_${entry.testCase}`.replace(/\s+/g, '_');
+        // For Cell Hardening and Volume Test, we need to match by test case name and cell
+        // since the frontend uses original test IDs but backend has unique test IDs
+        let shouldUpdate = false;
         
-        if (entryId === testId) {
-          console.log(`Updating entry: ${entryId}`);
-          console.log(`Status: ${entry.status} → ${status}`);
+        if (testId.startsWith('CH-') || testId.startsWith('VT-')) {
+          // For Cell Hardening and Volume Test, match by test case name, cell type, and cell
+          // Extract the test case number from the testId (e.g., CH-1001 -> Cell Hardening - 1)
+          let expectedTestCase = '';
+          if (testId.startsWith('CH-')) {
+            const testNumber = testId.replace('CH-', '');
+            expectedTestCase = `Cell Hardening - ${testNumber.slice(-1)}`; // Last digit is the day number
+          } else if (testId.startsWith('VT-')) {
+            expectedTestCase = 'Volume Test';
+          }
+          
+          shouldUpdate = entry.testCase && 
+                        entry.testCase === expectedTestCase &&
+                        entry.cellType === cellType &&
+                        entry.cell === cell &&
+                        entry.site === site;
+        } else {
+          // For regular test cases, use testId, cell type, cell, and site combination
+          shouldUpdate = entry.testId === testId && entry.cellType === cellType && entry.cell === cell && entry.site === site;
+        }
+        
+        if (shouldUpdate) {
+          console.log(`Updating entry: ${entry.testId} for cell: ${entry.cell}`);
+          if (status) {
+            console.log(`Status: ${entry.status} → ${status}`);
+          }
+          if (day && date && productionNumber) {
+            console.log(`Adding Day ${day} hardening data: ${productionNumber} units on ${date}`);
+          }
+          
           updated = true;
-          return {
+          const updatedEntry = {
             ...entry,
-            status: status,
-            lastModified: lastModified,
-            modifiedUser: modifiedUser
+            lastModified: lastModified || entry.lastModified,
+            modifiedUser: modifiedUser || entry.modifiedUser
           };
+          
+          // Update status if provided
+          if (status) {
+            updatedEntry.status = status;
+          }
+          
+          // Update hardening data if provided (simple CH Volume/Date)
+          if (productionNumber !== undefined && !volume) {
+            updatedEntry.chVolume = productionNumber;
+          }
+          if (date !== undefined && !startDateTime) {
+            updatedEntry.chDate = date;
+          }
+          
+          // Clear CH data if status is NOT RUN
+          if (status === 'NOT RUN') {
+            updatedEntry.chVolume = '';
+            updatedEntry.chDate = '';
+          }
+          
+          // Update Volume Test data if provided
+          if (volume !== undefined) {
+            updatedEntry.vtVolume = volume;
+          }
+          if (startDateTime !== undefined) {
+            updatedEntry.vtStartDateTime = startDateTime;
+          }
+          if (endDateTime !== undefined) {
+            updatedEntry.vtEndDateTime = endDateTime;
+          }
+          
+
+          
+          return updatedEntry;
         }
         return entry;
       });
@@ -87,7 +149,11 @@ class TestStatusController {
           testId,
           status,
           lastModified,
-          modifiedUser
+          modifiedUser,
+          day,
+          date,
+          productionNumber,
+          notes
         }
       });
       
@@ -111,12 +177,13 @@ class TestStatusController {
         totalTests: testStatus.length,
         passCount: testStatus.filter(t => t.status === 'PASS').length,
         failCount: testStatus.filter(t => t.status === 'FAIL').length,
+        blockedCount: testStatus.filter(t => t.status === 'BLOCKED').length,
         notRunCount: testStatus.filter(t => t.status === 'NOT RUN' || !t.status).length,
         completionRate: 0,
         passRate: 0
       };
       
-      const completedTests = stats.passCount + stats.failCount;
+      const completedTests = stats.passCount + stats.failCount + stats.blockedCount;
       if (stats.totalTests > 0) {
         stats.completionRate = Math.round((completedTests / stats.totalTests) * 100);
       }
@@ -134,29 +201,32 @@ class TestStatusController {
       testStatus.forEach(entry => {
         // By site
         if (!groupedStats.bySite[entry.site]) {
-          groupedStats.bySite[entry.site] = { total: 0, passed: 0, failed: 0, notRun: 0 };
+          groupedStats.bySite[entry.site] = { total: 0, passed: 0, failed: 0, blocked: 0, notRun: 0 };
         }
         groupedStats.bySite[entry.site].total++;
         if (entry.status === 'PASS') groupedStats.bySite[entry.site].passed++;
         else if (entry.status === 'FAIL') groupedStats.bySite[entry.site].failed++;
+        else if (entry.status === 'BLOCKED') groupedStats.bySite[entry.site].blocked++;
         else groupedStats.bySite[entry.site].notRun++;
         
         // By phase
         if (!groupedStats.byPhase[entry.phase]) {
-          groupedStats.byPhase[entry.phase] = { total: 0, passed: 0, failed: 0, notRun: 0 };
+          groupedStats.byPhase[entry.phase] = { total: 0, passed: 0, failed: 0, blocked: 0, notRun: 0 };
         }
         groupedStats.byPhase[entry.phase].total++;
         if (entry.status === 'PASS') groupedStats.byPhase[entry.phase].passed++;
         else if (entry.status === 'FAIL') groupedStats.byPhase[entry.phase].failed++;
+        else if (entry.status === 'BLOCKED') groupedStats.byPhase[entry.phase].blocked++;
         else groupedStats.byPhase[entry.phase].notRun++;
         
         // By cell type
         if (!groupedStats.byCellType[entry.cellType]) {
-          groupedStats.byCellType[entry.cellType] = { total: 0, passed: 0, failed: 0, notRun: 0 };
+          groupedStats.byCellType[entry.cellType] = { total: 0, passed: 0, failed: 0, blocked: 0, notRun: 0 };
         }
         groupedStats.byCellType[entry.cellType].total++;
         if (entry.status === 'PASS') groupedStats.byCellType[entry.cellType].passed++;
         else if (entry.status === 'FAIL') groupedStats.byCellType[entry.cellType].failed++;
+        else if (entry.status === 'BLOCKED') groupedStats.byCellType[entry.cellType].blocked++;
         else groupedStats.byCellType[entry.cellType].notRun++;
       });
       
@@ -175,6 +245,69 @@ class TestStatusController {
       res.status(500).json({
         success: false,
         message: 'Error calculating statistics',
+        error: error.message
+      });
+    }
+  }
+
+  async submitTestResults(req, res) {
+    console.log('=== SUBMIT TEST RESULTS ===');
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    
+    try {
+      const { site, submittedBy, submittedAt, totalTests, passedTests, results } = req.body;
+      
+      if (!site || !results || results.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Site and results are required'
+        });
+      }
+      
+      // Verify all tests are marked as PASS
+      const notPassedTests = results.filter(r => r.status !== 'PASS');
+      if (notPassedTests.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: `Cannot submit: ${notPassedTests.length} test(s) are not marked as PASS`
+        });
+      }
+      
+      // Save results to a separate results file
+      const resultsData = {
+        submissionId: `submission_${Date.now()}`,
+        site,
+        submittedBy,
+        submittedAt,
+        totalTests,
+        passedTests,
+        results
+      };
+      
+      // Save to Excel file
+      const saved = excelService.saveTestResults(resultsData);
+      
+      if (saved) {
+        console.log(`Test results submitted successfully for site: ${site}`);
+        res.json({
+          success: true,
+          message: `Successfully submitted ${totalTests} test results for site: ${site}`,
+          data: {
+            submissionId: resultsData.submissionId,
+            site,
+            totalTests,
+            passedTests
+          }
+        });
+      } else {
+        throw new Error('Failed to save test results');
+      }
+      
+    } catch (error) {
+      console.error('Error submitting test results:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error submitting test results',
         error: error.message
       });
     }

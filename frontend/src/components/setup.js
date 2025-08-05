@@ -1,250 +1,327 @@
-import React, { useState } from 'react';
-import { setupAPI } from '../services/api';
+import React, { useState, useEffect } from 'react';
+import { setupAPI, testCasesAPI } from '../services/api';
 
-const Setup = ({ testCases, availableCellTypes, currentUser }) => {
-  const [setupForm, setSetupForm] = useState({
-    siteNumber: '',
+const Setup = () => {
+  const [formData, setFormData] = useState({
+    siteName: '',
     phase: '',
-    machines: [{ type: '', quantity: 1 }]
+    cellTypes: [
+      { cellType: '', quantity: '', cellNames: [''] }
+    ]
   });
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [availableCellTypes, setAvailableCellTypes] = useState([]);
 
-  // Generate cell IDs dynamically based on type and quantity
-  const generateCellIds = (type, quantity) => {
-    const baseNumbers = {
-      'A': 100, 'B': 200, 'C': 300, 'D': 400, 'MCP': 500
-    };
-    
-    const baseNumber = baseNumbers[type] || 100;
-    return Array.from({ length: quantity }, (_, i) => `${type}${baseNumber + i + 1}`);
-  };
+  useEffect(() => {
+    loadCellTypes();
+  }, []);
 
-  // Add machine type
-  const addMachineType = () => {
-    setSetupForm(prev => ({
-      ...prev,
-      machines: [...prev.machines, { type: '', quantity: 1 }]
-    }));
-  };
-
-  // Remove machine type
-  const removeMachineType = (index) => {
-    setSetupForm(prev => ({
-      ...prev,
-      machines: prev.machines.filter((_, i) => i !== index)
-    }));
-  };
-
-  // Update machine
-  const updateMachine = (index, field, value) => {
-    setSetupForm(prev => ({
-      ...prev,
-      machines: prev.machines.map((machine, i) => 
-        i === index ? { ...machine, [field]: value } : machine
-      )
-    }));
-  };
-
-  // Handle form submission with API call
-  const handleSetupSubmit = async () => {
-    if (!setupForm.siteNumber || !setupForm.phase) {
-      alert('Please enter both Site Number and Phase');
-      return;
+  const loadCellTypes = async () => {
+    try {
+      const response = await testCasesAPI.getCellTypes();
+      setAvailableCellTypes(response.data.data);
+    } catch (error) {
+      console.error('Error loading cell types:', error);
+      setMessage('Error loading available cell types');
     }
+  };
 
-    const validMachines = setupForm.machines.filter(m => m.type && m.quantity > 0);
-    if (validMachines.length === 0) {
-      alert('Please configure at least one machine type');
-      return;
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleCellTypeChange = (index, field, value) => {
+    setFormData(prev => {
+      const updatedCellTypes = [...prev.cellTypes];
+      updatedCellTypes[index] = {
+        ...updatedCellTypes[index],
+        [field]: field === 'quantity' ? value : value
+      };
+      
+      // If quantity changed, update cell names immediately
+      if (field === 'quantity') {
+        const newQuantity = parseInt(value) || 0;
+        const currentCellNames = updatedCellTypes[index].cellNames || [];
+        const updatedCellNames = [];
+        for (let i = 0; i < newQuantity; i++) {
+          updatedCellNames[i] = currentCellNames[i] || '';
+        }
+        updatedCellTypes[index].cellNames = updatedCellNames;
+      }
+      
+      return {
+        ...prev,
+        cellTypes: updatedCellTypes
+      };
+    });
+  };
+
+  const handleCellNameChange = (cellTypeIndex, cellIndex, value) => {
+    const updatedCellTypes = [...formData.cellTypes];
+    updatedCellTypes[cellTypeIndex].cellNames[cellIndex] = value;
+    setFormData(prev => ({
+      ...prev,
+      cellTypes: updatedCellTypes
+    }));
+  };
+
+  const addCellType = () => {
+    setFormData(prev => ({
+      ...prev,
+      cellTypes: [
+        ...prev.cellTypes,
+        { cellType: '', quantity: '', cellNames: [''] }
+      ]
+    }));
+  };
+
+  const removeCellType = (index) => {
+    if (formData.cellTypes.length > 1) {
+      setFormData(prev => ({
+        ...prev,
+        cellTypes: prev.cellTypes.filter((_, i) => i !== index)
+      }));
     }
+  };
+
+
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage('');
 
     try {
-      // Call the backend API
-      const response = await setupAPI.createSite({
-        siteNumber: setupForm.siteNumber,
-        phase: setupForm.phase,
-        machines: validMachines,
-        user: currentUser
+      // Validate form data
+      if (!formData.siteName.trim()) {
+        throw new Error('Site name is required');
+      }
+      if (!formData.phase.trim()) {
+        throw new Error('Phase is required');
+      }
+
+      const validCellTypes = formData.cellTypes.filter(ct => 
+        ct.cellType.trim() && ct.quantity && parseInt(ct.quantity) > 0
+      );
+
+      if (validCellTypes.length === 0) {
+        throw new Error('At least one cell type is required');
+      }
+
+      // Validate cell names
+      for (let i = 0; i < validCellTypes.length; i++) {
+        const ct = validCellTypes[i];
+        const quantity = parseInt(ct.quantity);
+        if (ct.cellNames.length !== quantity) {
+          throw new Error(`Cell names count must match quantity for ${ct.cellType}`);
+        }
+        for (let j = 0; j < ct.cellNames.length; j++) {
+          if (!ct.cellNames[j].trim()) {
+            throw new Error(`Cell name ${j + 1} for ${ct.cellType} is required`);
+          }
+        }
+      }
+
+      await setupAPI.createSite({
+        siteName: formData.siteName,
+        phase: formData.phase,
+        cellTypes: validCellTypes
       });
 
-      if (response.data.success) {
-        // Show success message with details
-        const summary = response.data.data.machines.map(m => 
-          `${m.quantity}x ${m.type} cells (${m.testCases} tests each) = ${m.quantity * m.testCases} total entries`
-        );
-
-        alert(
-          `${response.data.message}\n\n` +
-          `Created ${response.data.data.entriesCreated} test entries:\n${summary.join('\n')}\n\n` +
-          `✅ Data saved to Excel file!`
-        );
-
-        // Reset form
-        setSetupForm({
-          siteNumber: '',
+      setMessage('Site configuration created successfully!');
+      setFormData({
+        siteName: '',
           phase: '',
-          machines: [{ type: '', quantity: 1 }]
+        cellTypes: [{ cellType: '', quantity: '', cellNames: [''] }]
         });
-      }
     } catch (error) {
-      alert('Error creating site configuration: ' + (error.response?.data?.message || error.message));
-      console.error('Setup error:', error);
+      setMessage(error.message || 'Error creating site configuration');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="bg-white rounded-lg shadow-lg p-8">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
-          ⚙️ Site Configuration Setup
-        </h2>
-        
-        {/* Cell Types Info */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <div className="font-medium text-blue-800 mb-2">Available Cell Types from Excel</div>
-          <div className="text-blue-700 text-sm">
-            {availableCellTypes.map(type => {
-              const count = testCases.filter(tc => tc.cellType === type).length;
-              return `${type} (${count} tests)`;
-            }).join(', ')}
+    <div className="space-y-6">
+      {/* Header Section */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900 mb-2">
+              Site Configuration
+            </h1>
+            <p className="text-gray-600">
+              Set up new testing sites with custom cell configurations
+            </p>
+          </div>
+          <div className="flex items-center space-x-2 bg-blue-50 px-3 py-2 rounded-md">
+            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+            <span className="text-sm font-medium text-blue-700">Configuration</span>
           </div>
         </div>
+      </div>
+
+      {/* Setup Form */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Create New Site</h2>
         
-        <div className="space-y-6">
-          {/* Site and Phase inputs */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Basic Information */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Site Number</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Site Name *
+              </label>
               <input
                 type="text"
-                value={setupForm.siteNumber}
-                onChange={(e) => setSetupForm(prev => ({ ...prev, siteNumber: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                placeholder="e.g., SITE-1002"
+                name="siteName"
+                value={formData.siteName}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-10"
+                placeholder="Enter site name"
+                required
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Phase</label>
-              <input
-                type="text"
-                value={setupForm.phase}
-                onChange={(e) => setSetupForm(prev => ({ ...prev, phase: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                placeholder="e.g., Phase 1"
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Phase *
+              </label>
+              <select
+                name="phase"
+                value={formData.phase}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-10"
+                required
+              >
+                <option value="">Select a phase...</option>
+                <option value="Phase 1">Phase 1</option>
+                <option value="Phase 2">Phase 2</option>
+                <option value="Phase 3">Phase 3</option>
+              </select>
             </div>
           </div>
 
-          {/* Machine Configuration */}
+          {/* Cell Types */}
           <div>
             <div className="flex items-center justify-between mb-4">
-              <label className="block text-sm font-medium text-gray-700">Machine Configuration</label>
+              <h3 className="text-md font-semibold text-gray-900">Cell Types</h3>
               <button
-                onClick={addMachineType}
-                className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                disabled={availableCellTypes.length === 0}
+                type="button"
+                onClick={addCellType}
+                className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
               >
-                ➕ Add Machine Type
+                Add Cell Type
               </button>
             </div>
             
             <div className="space-y-4">
-              {setupForm.machines.map((machine, index) => (
-                <div key={index} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                  <div className="flex-1">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Machine Type</label>
-                    <select
-                      value={machine.type}
-                      onChange={(e) => updateMachine(index, 'type', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Select Type...</option>
-                      {availableCellTypes.map(cellType => {
-                        const testCount = testCases.filter(tc => tc.cellType === cellType).length;
-                        return (
-                          <option key={cellType} value={cellType}>
-                            {cellType} ({testCount} test cases)
-                          </option>
-                        );
-                      })}
-                    </select>
+              {formData.cellTypes.map((cellType, index) => (
+                <div key={index} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-medium text-gray-900">Cell Type {index + 1}</h4>
+                    {formData.cellTypes.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeCellType(index)}
+                        className="text-red-600 hover:text-red-800 text-sm"
+                      >
+                        Remove
+                      </button>
+                    )}
                   </div>
                   
-                  <div className="flex-1">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Quantity</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="5"
-                      value={machine.quantity}
-                      onChange={(e) => updateMachine(index, 'quantity', parseInt(e.target.value) || 1)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  
-                  <div className="flex-1">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Will Create Cells</label>
-                    <div className="px-3 py-2 bg-gray-100 rounded text-sm text-gray-600">
-                      {machine.type && machine.quantity ? 
-                        generateCellIds(machine.type, machine.quantity).join(', ') : 
-                        'Select type & quantity'
-                      }
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Cell Type *
+                      </label>
+                      <select
+                        value={cellType.cellType}
+                        onChange={(e) => handleCellTypeChange(index, 'cellType', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-10"
+                        required
+                      >
+                        <option value="">Select a cell type...</option>
+                        {availableCellTypes.map((type, i) => (
+                          <option key={i} value={type}>{type}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Quantity *
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={cellType.quantity}
+                        onChange={(e) => handleCellTypeChange(index, 'quantity', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-10"
+                        required
+                      />
                     </div>
                   </div>
                   
-                  {setupForm.machines.length > 1 && (
-                    <button
-                      onClick={() => removeMachineType(index)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-md"
-                    >
-                      🗑️
-                    </button>
-                  )}
+                  {/* Cell Names */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Cell Names *
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {cellType.cellNames.map((cellName, cellIndex) => (
+                        <input
+                          key={cellIndex}
+                          type="text"
+                          value={cellName}
+                          onChange={(e) => handleCellNameChange(index, cellIndex, e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-10"
+                          placeholder={`Cell ${cellIndex + 1}`}
+                          required
+                        />
+                      ))}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Setup Summary */}
-          {setupForm.machines.filter(m => m.type && m.quantity > 0).length > 0 && (
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h3 className="font-medium text-blue-800 mb-2">Setup Summary</h3>
-              <div className="text-blue-700 text-sm space-y-1">
-                {setupForm.machines.filter(m => m.type && m.quantity > 0).map((machine, index) => {
-                  const testCount = testCases.filter(tc => tc.cellType === machine.type).length;
-                  const totalEntries = machine.quantity * testCount;
-                  return (
-                    <div key={index}>
-                      • {machine.quantity} {machine.type}-cells × {testCount} tests = {totalEntries} entries
-                    </div>
-                  );
-                })}
-                <div className="pt-2 border-t border-blue-200 font-medium">
-                  Total: {setupForm.machines
-                    .filter(m => m.type && m.quantity > 0)
-                    .reduce((sum, machine) => {
-                      const testCount = testCases.filter(tc => tc.cellType === machine.type).length;
-                      return sum + (machine.quantity * testCount);
-                    }, 0)} test entries will be created
-                </div>
-              </div>
+          {/* Message Display */}
+          {message && (
+            <div className={`p-4 rounded-md ${
+              message.includes('Error') || message.includes('required') 
+                ? 'bg-red-50 border border-red-200 text-red-700' 
+                : 'bg-green-50 border border-green-200 text-green-700'
+            }`}>
+              {message}
             </div>
           )}
 
           {/* Submit Button */}
+          <div className="flex justify-end">
           <button
-            onClick={handleSetupSubmit}
-            className="w-full flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium disabled:opacity-50"
-            disabled={
-              !setupForm.siteNumber || 
-              !setupForm.phase ||
-              setupForm.machines.filter(m => m.type && m.quantity > 0).length === 0
-            }
-          >
-            💾 Create Site Configuration
+              type="submit"
+              disabled={loading}
+              className={`px-6 py-2 rounded-md font-medium transition-colors ${
+                loading
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+            >
+              {loading ? 'Creating...' : 'Create Site Configuration'}
           </button>
         </div>
+        </form>
       </div>
+
+
     </div>
   );
 };

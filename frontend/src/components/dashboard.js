@@ -1,161 +1,198 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { testStatusAPI } from '../services/api';
 
-const Dashboard = ({ testCases, availableCellTypes, currentUser, setCurrentUser }) => {
-  // Calculate statistics dynamically from real data
-  const calculateStats = () => {
-    // For now, return zeros since we don't have test results yet
-    return {
-      totalTests: 0,
-      passCount: 0,
-      failCount: 0,
-      notRunCount: 0,
-      completionRate: 0,
-      passRate: 0
-    };
+const Dashboard = () => {
+  const [statistics, setStatistics] = useState({
+    totalTests: 0,
+    passedTests: 0,
+    failedTests: 0,
+    notRunTests: 0,
+    testCasesByCellType: {}
+  });
+
+  useEffect(() => {
+    loadStatistics();
+  }, []);
+
+  const loadStatistics = async () => {
+    try {
+      const response = await testStatusAPI.getStatistics();
+      if (response.data.success) {
+        const { overall, grouped } = response.data.data;
+        setStatistics({
+          totalTests: overall.totalTests || 0,
+          passedTests: overall.passCount || 0,
+          failedTests: overall.failCount || 0,
+          notRunTests: overall.notRunCount || 0,
+          testCasesByCellType: grouped?.byCellType || {}
+        });
+      }
+    } catch (error) {
+      console.error('Error loading statistics:', error);
+    }
   };
 
-  const stats = calculateStats();
+  const getPassRate = () => {
+    if (statistics.totalTests === 0) return 0;
+    return Math.round((statistics.passedTests / statistics.totalTests) * 100);
+  };
 
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-8">
-      {/* System Status */}
-      <div className="bg-white rounded-lg shadow-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-600">Current User:</span>
-            <input
-              type="text"
-              value={currentUser}
-              onChange={(e) => setCurrentUser(e.target.value)}
-              className="px-2 py-1 border border-gray-300 rounded text-sm"
-            />
+    <div className="space-y-6">
+      {/* Header Section */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900 mb-2">
+              Testing Dashboard
+            </h1>
+            <p className="text-gray-600">
+              Overview of your testing progress and statistics
+            </p>
           </div>
-          
           <button
-            onClick={() => window.location.reload()}
-            className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+            onClick={loadStatistics}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
           >
-            🔄 Refresh Data
+            Refresh Data
           </button>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-          <div className="bg-blue-50 p-3 rounded">
-            <div className="font-medium text-blue-800">Test Cases Available</div>
-            <div className="text-blue-700">{testCases.length} test cases loaded from Excel</div>
-          </div>
-          <div className="bg-green-50 p-3 rounded">
-            <div className="font-medium text-green-800">Cell Types</div>
-            <div className="text-green-700">
-              {availableCellTypes.length > 0 ? 
-                availableCellTypes.join(', ') : 
-                'Loading...'
-              }
-            </div>
-          </div>
-          <div className="bg-purple-50 p-3 rounded">
-            <div className="font-medium text-purple-800">System Status</div>
-            <div className="text-purple-700">Connected to Excel files</div>
-          </div>
         </div>
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg shadow-lg p-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Tests</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.totalTests}</p>
+              <p className="text-2xl font-bold text-gray-900">{statistics.totalTests}</p>
             </div>
-            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-              <span className="text-blue-600">📊</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Pass Rate</p>
-              <p className="text-3xl font-bold text-green-600">{stats.passRate}%</p>
-            </div>
-            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-              <span className="text-green-600">✅</span>
+            <div className="w-8 h-8 bg-blue-100 rounded-md flex items-center justify-center">
+              <span className="text-blue-600 text-sm">📊</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-lg p-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Completion</p>
-              <p className="text-3xl font-bold text-blue-600">{stats.completionRate}%</p>
+              <p className="text-sm font-medium text-gray-600">Passed</p>
+              <p className="text-2xl font-bold text-green-600">{statistics.passedTests}</p>
             </div>
-            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-              <span className="text-blue-600">📈</span>
+            <div className="w-8 h-8 bg-green-100 rounded-md flex items-center justify-center">
+              <span className="text-green-600 text-sm">✅</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-lg p-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Failed Tests</p>
-              <p className="text-3xl font-bold text-red-600">{stats.failCount}</p>
+              <p className="text-sm font-medium text-gray-600">Failed</p>
+              <p className="text-2xl font-bold text-red-600">{statistics.failedTests}</p>
             </div>
-            <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-              <span className="text-red-600">⚠️</span>
+            <div className="w-8 h-8 bg-red-100 rounded-md flex items-center justify-center">
+              <span className="text-red-600 text-sm">❌</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Not Run</p>
+              <p className="text-2xl font-bold text-gray-600">{statistics.notRunTests}</p>
+            </div>
+            <div className="w-8 h-8 bg-gray-100 rounded-md flex items-center justify-center">
+              <span className="text-gray-600 text-sm">⏸️</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Dynamic Test Cases by Cell Type from Excel */}
-      {testCases.length > 0 && (
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6">
-            📋 Test Cases from Excel File (Dynamic)
-          </h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-            {availableCellTypes.map(cellType => {
-              const typeCases = testCases.filter(tc => tc.cellType === cellType);
-              return (
-                <div key={cellType} className="bg-gray-50 rounded-lg p-4 border-l-4 border-blue-500">
-                  <h3 className="font-semibold text-lg text-gray-800 mb-2">Cell Type {cellType}</h3>
-                  <p className="text-2xl font-bold text-blue-600 mb-2">{typeCases.length}</p>
-                  <p className="text-gray-600 text-sm mb-3">Test Cases</p>
-                  <div className="text-xs text-gray-500 space-y-1 max-h-24 overflow-y-auto">
-                    {typeCases.map(tc => (
-                      <div key={tc.caseId} className="truncate p-1 bg-white rounded" title={`${tc.testCase} (${tc.scope})`}>
-                        <strong>{tc.caseId}:</strong> {tc.testCase}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+      {/* Progress Overview */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Overall Progress</h3>
+        <div className="space-y-4">
+          <div>
+            <div className="flex justify-between text-sm text-gray-600 mb-2">
+              <span>Pass Rate</span>
+              <span>{getPassRate()}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${getPassRate()}%` }}
+              ></div>
+            </div>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Getting Started Guide */}
-      <div className="bg-white rounded-lg shadow-lg p-8">
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">🚀 Next Steps</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <h3 className="font-medium text-blue-800 mb-2">✏️ Setup Sites</h3>
-            <p className="text-blue-700 text-sm">
-              Configure your sites, phases, and machines using the Setup tab to create test instances.
-            </p>
+      {/* Test Cases by Cell Type */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Test Cases by Cell Type</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Object.entries(statistics.testCasesByCellType || {}).map(([cellType, stats]) => (
+            <div key={cellType} className="bg-gray-50 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-gray-900">{cellType}</p>
+                  <p className="text-sm text-gray-600">{stats.total} test cases</p>
+                  <div className="flex space-x-2 mt-1">
+                    <span className="text-xs text-green-600">{stats.passed} ✅</span>
+                    <span className="text-xs text-red-600">{stats.failed} ❌</span>
+                    <span className="text-xs text-gray-600">{stats.notRun} ⏸️</span>
+                  </div>
+                </div>
+                <div className="w-6 h-6 bg-blue-600 rounded-md flex items-center justify-center">
+                  <span className="text-white text-xs font-semibold">{cellType}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        {(!statistics.testCasesByCellType || Object.keys(statistics.testCasesByCellType || {}).length === 0) && (
+          <div className="text-center py-8 text-gray-500">
+            <p>No test cases configured yet.</p>
+            <p className="text-sm">Use the Setup tab to configure your testing environment.</p>
           </div>
-          <div className="bg-green-50 p-4 rounded-lg">
-            <h3 className="font-medium text-green-800 mb-2">🧪 Run Tests</h3>
-            <p className="text-green-700 text-sm">
-              Once configured, use the Testing tab to record PASS/FAIL results for each test case.
-            </p>
-          </div>
+        )}
+      </div>
+
+      {/* Quick Actions */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <button
+            onClick={() => window.location.href = '#testing'}
+            className="p-4 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors text-left"
+          >
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-blue-600 rounded-md flex items-center justify-center">
+                <span className="text-white text-sm">✅</span>
+              </div>
+              <div>
+                <p className="font-medium text-gray-900">Start Testing</p>
+                <p className="text-sm text-gray-600">Execute functional tests</p>
+              </div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => window.location.href = '#setup'}
+            className="p-4 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors text-left"
+          >
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-gray-600 rounded-md flex items-center justify-center">
+                <span className="text-white text-sm">⚙️</span>
+              </div>
+              <div>
+                <p className="font-medium text-gray-900">Setup Configuration</p>
+                <p className="text-sm text-gray-600">Configure sites and cells</p>
+              </div>
+            </div>
+          </button>
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'http://localhost:3002/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -12,19 +12,25 @@ const api = axios.create({
 // Test Cases API
 export const testCasesAPI = {
   getAll: () => api.get('/test-cases'),
+  getBySite: (site) => api.get(`/test-cases/site/${site}`),
   getCellTypes: () => api.get('/test-cases/cell-types'),
+  getSites: () => api.get('/test-cases/sites'),
 };
 
-// Test Status API (placeholder for now)
+// Test Status API
 export const testStatusAPI = {
   getAll: () => api.get('/test-status'),
   update: (statusData) => api.put('/test-status', statusData),
+  submitResults: (resultsData) => api.post('/test-status/submit', resultsData),
+  getStatistics: () => api.get('/test-status/statistics'),
 };
 
-// Setup API (placeholder for now)
+// Setup API
 export const setupAPI = {
   createSite: (siteData) => api.post('/setup/site', siteData),
   getSites: () => api.get('/setup/sites'),
 };
+
+
 
 export default api;

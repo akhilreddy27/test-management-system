@@ -1,24 +1,14 @@
 const excelService = require('../services/excelService');
 
-// Move generateCellIds outside the class to avoid scope issues
-function generateCellIds(cellType, quantity) {
-  const baseNumbers = {
-    'A': 100, 'B': 200, 'C': 300, 'D': 400, 'MCP': 500
-  };
-  
-  const baseNumber = baseNumbers[cellType] || (cellType.charCodeAt(0) * 100);
-  return Array.from({ length: quantity }, (_, i) => `${cellType}${baseNumber + i + 1}`);
-}
-
 class SetupController {
   async createSiteConfiguration(req, res) {
     console.log('=== SETUP REQUEST RECEIVED ===');
     console.log('Request body:', JSON.stringify(req.body, null, 2));
     
     try {
-      const { siteNumber, phase, machines, user } = req.body;
+      const { siteName, phase, cellTypes, user } = req.body;
       
-      console.log('Extracted data:', { siteNumber, phase, machines, user });
+      console.log('Extracted data:', { siteName, phase, cellTypes, user });
       
       // Get test cases for validation
       console.log('Reading test cases...');
@@ -28,30 +18,72 @@ class SetupController {
       // Generate test status entries
       const newStatusEntries = [];
       
-      machines.forEach(machine => {
-        const { type, quantity } = machine;
-        console.log(`Processing machine: ${type} x ${quantity}`);
+      cellTypes.forEach(cellType => {
+        const { cellType: type, quantity, cellNames } = cellType;
+        console.log(`Processing cell type: ${type} x ${quantity}`);
+        console.log('Custom cell names:', cellNames);
         
-        const cellIds = generateCellIds(type, quantity); // Use the standalone function
-        console.log('Generated cell IDs:', cellIds);
+        // Use custom cell names if provided, otherwise generate default ones
+        const quantityNum = parseInt(quantity);
+        const cellIds = cellNames && cellNames.length === quantityNum ? 
+          cellNames : 
+          Array.from({ length: quantityNum }, (_, i) => `${type}${i + 1}`);
         
-        const relevantTestCases = allTestCases.filter(tc => tc.cellType === type);
-        console.log(`Found ${relevantTestCases.length} test cases for type ${type}`);
+        console.log('Using cell IDs:', cellIds);
+        
+        // Include all non-System scope test cases for individual cells (Cell, Safety, and any new scopes)
+        const relevantTestCases = allTestCases.filter(tc => 
+          tc.cellType === type && tc.scope !== 'System'
+        );
+        console.log(`Found ${relevantTestCases.length} non-System test cases for type ${type}`);
         
         cellIds.forEach(cellId => {
           relevantTestCases.forEach(testCase => {
             newStatusEntries.push({
-              site: siteNumber,
+              site: siteName,
               phase: phase,
               cellType: type,
               cell: cellId,
               testCase: testCase.testCase,
-              caseId: testCase.caseId,
+              testId: testCase.testId,
+              scope: testCase.scope,
               status: 'NOT RUN',
               lastModified: new Date().toISOString(),
-              modifiedUser: user
+              modifiedUser: user,
+              chVolume: '',
+              chDate: '',
+              vtVolume: '',
+              vtStartDateTime: '',
+              vtEndDateTime: ''
             });
           });
+        });
+      });
+
+      // Also create System scope test cases for configured cell types
+      const configuredCellTypes = cellTypes.map(ct => ct.cellType);
+      const systemTestCases = allTestCases.filter(tc => 
+        tc.scope === 'System' && configuredCellTypes.includes(tc.cellType)
+      );
+      console.log(`Found ${systemTestCases.length} system test cases for configured cell types`);
+      
+      systemTestCases.forEach(testCase => {
+        newStatusEntries.push({
+          site: siteName,
+          phase: phase,
+          cellType: testCase.cellType,
+          cell: 'SYSTEM',
+          testCase: testCase.testCase,
+          testId: testCase.testId,
+          scope: testCase.scope,
+          status: 'NOT RUN',
+          lastModified: new Date().toISOString(),
+          modifiedUser: user,
+          chVolume: '',
+          chDate: '',
+          vtVolume: '',
+          vtStartDateTime: '',
+          vtEndDateTime: ''
         });
       });
 
@@ -72,14 +104,14 @@ class SetupController {
 
       res.json({
         success: true,
-        message: `Site ${siteNumber} - ${phase} configured successfully`,
+        message: `Site ${siteName} - ${phase} configured successfully`,
         data: {
           entriesCreated: newStatusEntries.length,
-          machines: machines.map(m => ({
-            type: m.type,
-            quantity: m.quantity,
-            cells: generateCellIds(m.type, m.quantity), // Use standalone function here too
-            testCases: allTestCases.filter(tc => tc.cellType === m.type).length
+          cellTypes: cellTypes.map(ct => ({
+            type: ct.cellType,
+            quantity: ct.quantity,
+            cells: ct.cellNames || Array.from({ length: ct.quantity }, (_, i) => `${ct.cellType}${i + 1}`),
+            testCases: allTestCases.filter(tc => tc.cellType === ct.cellType).length
           }))
         }
       });
