@@ -19,6 +19,14 @@ const Testing = ({ currentUser }) => {
   
   // State for CH/VT data entry
   const [chVtData, setChVtData] = useState({});
+  
+  // State for searchable dropdown
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // State for cell type searchable dropdown
+  const [isCellTypeDropdownOpen, setIsCellTypeDropdownOpen] = useState(false);
+  const [cellTypeSearchTerm, setCellTypeSearchTerm] = useState('');
 
   useEffect(() => {
     loadTestCaseConfigurations();
@@ -33,12 +41,39 @@ const Testing = ({ currentUser }) => {
     }
   }, [selectedSite]);
 
+  // Handle clicking outside dropdown to close it
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isDropdownOpen && !event.target.closest('.relative')) {
+        setIsDropdownOpen(false);
+        setSearchTerm('');
+      }
+      if (isCellTypeDropdownOpen && !event.target.closest('.cell-type-dropdown')) {
+        setIsCellTypeDropdownOpen(false);
+        setCellTypeSearchTerm('');
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDropdownOpen, isCellTypeDropdownOpen]);
+
   const loadSites = async () => {
     try {
       const response = await setupAPI.getSites();
-      // Convert object keys to array of site names
-      const sitesArray = Object.keys(response.data.data);
-      setAvailableSites(sitesArray);
+      // Convert the nested structure to site-phase combinations
+      const sitesData = response.data.data;
+      const sitePhaseCombinations = [];
+      
+      Object.keys(sitesData).forEach(siteName => {
+        Object.keys(sitesData[siteName]).forEach(phaseName => {
+          sitePhaseCombinations.push(`${siteName} - ${phaseName}`);
+        });
+      });
+      
+      setAvailableSites(sitePhaseCombinations);
     } catch (error) {
       console.error('Error loading sites:', error);
       setError('Failed to load available sites');
@@ -55,12 +90,24 @@ const Testing = ({ currentUser }) => {
     }
   };
 
-  const loadTestCasesForSite = async (site) => {
+  const loadTestCasesForSite = async (sitePhaseCombination) => {
     try {
       setLoading(true);
       setError(null);
       
-      const response = await testCasesAPI.getBySite(site);
+      // Extract site name and phase from site-phase combination
+      // Handle site names that contain dashes by splitting on the last occurrence of " - "
+      const lastDashIndex = sitePhaseCombination.lastIndexOf(' - ');
+      const siteName = sitePhaseCombination.substring(0, lastDashIndex);
+      const phase = sitePhaseCombination.substring(lastDashIndex + 3);
+      
+      console.log('Loading test cases for:', { siteName, phase, sitePhaseCombination });
+      
+      // Call API with both site and phase parameters
+      const response = await testCasesAPI.getBySite(siteName, phase);
+      
+      console.log('API Response:', response.data);
+      
       setTestCases(response.data.data);
       
       // Load current data from the backend dynamically
@@ -72,10 +119,9 @@ const Testing = ({ currentUser }) => {
           const data = {};
           
           // Map backend fields to frontend fields based on configuration
-          const config = getTestCaseConfig(testCase);
           config.fields.forEach(fieldConfig => {
             const backendField = getFieldMapping(testCase, fieldConfig.name);
-            if (backendField) {
+            if (backendField && testCase[backendField] !== undefined) {
               data[fieldConfig.name] = testCase[backendField] || '';
             }
           });
@@ -85,8 +131,9 @@ const Testing = ({ currentUser }) => {
       });
       setChVtData(chVtDataFromBackend);
       
-      if (response.data.count === 0) {
-        setError(`No test cases found for site: ${site}`);
+      // Check if there are test cases - use both count and data length for safety
+      if (!response.data.data || response.data.data.length === 0 || response.data.count === 0) {
+        setError(`No test cases found for site: ${sitePhaseCombination}`);
       }
     } catch (error) {
       console.error('Error loading test cases:', error);
@@ -111,11 +158,15 @@ const Testing = ({ currentUser }) => {
         return;
       }
 
+      // Extract site name from site-phase combination
+      const lastDashIndex = selectedSite.lastIndexOf(' - ');
+      const siteName = selectedSite.substring(0, lastDashIndex);
+
       const response = await testStatusAPI.update({
         testId: testCase.uniqueTestId || testId, // Use unique test ID if available
         cell: testCase.cell, // Add cell information for uniqueness
         cellType: testCase.cellType, // Add cell type for uniqueness
-        site: selectedSite, // Add site for uniqueness
+        site: siteName, // Add site for uniqueness
         status,
         lastModified: new Date().toISOString(),
         modifiedUser: currentUser
@@ -164,6 +215,8 @@ const Testing = ({ currentUser }) => {
   };
 
   const handleChVtDataChange = async (testId, field, value) => {
+    console.log('handleChVtDataChange called:', { testId, field, value });
+    
     // Find the test case to determine its type and get unique test ID
     const testCase = testCases.find(tc => tc.uniqueTestId === testId || tc.testId === testId);
     if (!testCase) {
@@ -231,7 +284,9 @@ const Testing = ({ currentUser }) => {
         updateData[backendField] = value;
       }
 
-      await testStatusAPI.update(updateData);
+      console.log('Sending update data:', updateData);
+      const response = await testStatusAPI.update(updateData);
+      console.log('Update response:', response.data);
     } catch (error) {
       console.error('Error updating CH/VT data:', error);
       alert('Failed to save data. Please try again.');
@@ -348,6 +403,7 @@ const Testing = ({ currentUser }) => {
     }
   };
 
+  // Function to get test case type color based on test case name
   // Automatic scope color assignment system
   const [dynamicScopeColors, setDynamicScopeColors] = useState({});
   
@@ -500,6 +556,78 @@ const Testing = ({ currentUser }) => {
     }
   };
 
+  // Filter sites based on search term
+  const filteredSites = availableSites.filter(site =>
+    site.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Filter cell types based on search term
+  const filteredCellTypes = cellTypes.filter(type =>
+    type.toLowerCase().includes(cellTypeSearchTerm.toLowerCase())
+  );
+
+  // Handle site selection
+  const handleSiteSelect = (site) => {
+    setSelectedSite(site);
+    setIsDropdownOpen(false);
+    setSearchTerm('');
+  };
+
+  // Handle cell type selection
+  const handleCellTypeSelect = (cellType) => {
+    setSelectedCellType(cellType);
+    setIsCellTypeDropdownOpen(false);
+    setCellTypeSearchTerm('');
+  };
+
+  // Handle dropdown toggle
+  const toggleDropdown = () => {
+    setIsDropdownOpen(!isDropdownOpen);
+    if (!isDropdownOpen) {
+      setSearchTerm('');
+    }
+  };
+
+  // Handle cell type dropdown toggle
+  const toggleCellTypeDropdown = () => {
+    setIsCellTypeDropdownOpen(!isCellTypeDropdownOpen);
+    if (!isCellTypeDropdownOpen) {
+      setCellTypeSearchTerm('');
+    }
+  };
+
+  // Handle keyboard navigation
+  const handleKeyDown = (e) => {
+    if (e.key === 'Escape') {
+      setIsDropdownOpen(false);
+      setSearchTerm('');
+      setIsCellTypeDropdownOpen(false);
+      setCellTypeSearchTerm('');
+    }
+  };
+
+  // Helper function to highlight search term
+  const highlightSearchTerm = (text, searchTerm) => {
+    if (!searchTerm) return text;
+    const lowerText = text.toLowerCase();
+    const lowerSearch = searchTerm.toLowerCase();
+    const index = lowerText.indexOf(lowerSearch);
+    
+    if (index === -1) return text;
+    
+    const before = text.substring(0, index);
+    const match = text.substring(index, index + searchTerm.length);
+    const after = text.substring(index + searchTerm.length);
+    
+    return (
+      <>
+        {before}
+        <span className="bg-yellow-200 font-semibold">{match}</span>
+        {after}
+      </>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Site Selection */}
@@ -528,31 +656,129 @@ const Testing = ({ currentUser }) => {
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Available Sites</label>
-            <select
-              value={selectedSite}
-              onChange={(e) => setSelectedSite(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">Select a site...</option>
-              {availableSites.map(site => (
-                <option key={site} value={site}>{site}</option>
-              ))}
-            </select>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Sites</label>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={toggleDropdown}
+                onKeyDown={handleKeyDown}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-left flex items-center justify-between"
+              >
+                <span className={selectedSite ? 'text-gray-900' : 'text-gray-500'}>
+                  {selectedSite || 'Select a site...'}
+                </span>
+                <svg
+                  className={`w-5 h-5 text-gray-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              
+              {isDropdownOpen && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                  <div className="p-2 border-b border-gray-200">
+                    <input
+                      type="text"
+                      placeholder="Search sites..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="max-h-48 overflow-auto">
+                    {filteredSites.length > 0 ? (
+                      filteredSites.map(site => (
+                        <button
+                          key={site}
+                          type="button"
+                          onClick={() => handleSiteSelect(site)}
+                          onKeyDown={handleKeyDown}
+                          className="w-full px-3 py-2 text-left hover:bg-gray-100 focus:bg-gray-100 focus:outline-none text-sm"
+                        >
+                          {highlightSearchTerm(site, searchTerm)}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-3 py-2 text-gray-500 text-sm">
+                        No sites found
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Cell Type</label>
-            <select
-              value={selectedCellType}
-              onChange={(e) => setSelectedCellType(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="all">All Cell Types</option>
-              {cellTypes.map(type => (
-                <option key={type} value={type}>{type}</option>
-              ))}
-            </select>
+            <div className="relative cell-type-dropdown">
+              <button
+                type="button"
+                onClick={toggleCellTypeDropdown}
+                onKeyDown={handleKeyDown}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-left flex items-center justify-between"
+              >
+                <span className={selectedCellType !== 'all' ? 'text-gray-900' : 'text-gray-500'}>
+                  {selectedCellType === 'all' ? 'All Cell Types' : selectedCellType}
+                </span>
+                <svg
+                  className={`w-5 h-5 text-gray-400 transition-transform ${isCellTypeDropdownOpen ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              
+              {isCellTypeDropdownOpen && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                  <div className="p-2 border-b border-gray-200">
+                    <input
+                      type="text"
+                      placeholder="Search cell types..."
+                      value={cellTypeSearchTerm}
+                      onChange={(e) => setCellTypeSearchTerm(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="max-h-48 overflow-auto">
+                    <button
+                      type="button"
+                      onClick={() => handleCellTypeSelect('all')}
+                      onKeyDown={handleKeyDown}
+                      className="w-full px-3 py-2 text-left hover:bg-gray-100 focus:bg-gray-100 focus:outline-none text-sm font-medium"
+                    >
+                      All Cell Types
+                    </button>
+                    {filteredCellTypes.length > 0 ? (
+                      filteredCellTypes.map(type => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => handleCellTypeSelect(type)}
+                          onKeyDown={handleKeyDown}
+                          className="w-full px-3 py-2 text-left hover:bg-gray-100 focus:bg-gray-100 focus:outline-none text-sm"
+                        >
+                          {highlightSearchTerm(type, cellTypeSearchTerm)}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-3 py-2 text-gray-500 text-sm">
+                        No cell types found
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -679,7 +905,7 @@ const Testing = ({ currentUser }) => {
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {group.testCases.map((testCase, index) => (
-                          <tr key={testCase.testId} className={`hover:bg-gray-100 ${getScopeBackgroundColor(testCase.scope)}`}>
+                          <tr key={testCase.testId} className="hover:bg-gray-100">
                             <td className="px-6 py-4">
                               <div>
                                 <div className="font-medium text-gray-900 flex items-center space-x-2">
@@ -720,9 +946,37 @@ const Testing = ({ currentUser }) => {
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                               {hasDataEntryFields(testCase) ? (
                                 // Dynamic data entry fields based on test case configuration
-                                <div className="flex space-x-2">
-                                  {getDataEntryFields(testCase).map((fieldConfig, index) => (
-                                    <div key={index}>
+                                <div className="flex flex-col space-y-1">
+                                  {/* First row: Volume and Availability fields */}
+                                  <div className="flex space-x-2">
+                                    {getDataEntryFields(testCase).filter(fieldConfig => 
+                                      fieldConfig.type !== 'datetime-local'
+                                    ).map((fieldConfig, index) => (
+                                      <div key={index}>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                          {fieldConfig.label}
+                                        </label>
+                                        <input
+                                          type={fieldConfig.type}
+                                          placeholder={fieldConfig.placeholder || fieldConfig.label}
+                                          value={chVtData[testCase.uniqueTestId || testCase.testId]?.[fieldConfig.name] || ''}
+                                          onChange={(e) => handleChVtDataChange(testCase.uniqueTestId || testCase.testId, fieldConfig.name, e.target.value)}
+                                          className={`px-2 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500 ${
+                                            fieldConfig.type === 'date' ? 'w-24' : 
+                                            fieldConfig.type === 'number' ? 'w-20' : 'w-20'
+                                          }`}
+                                          min={fieldConfig.min !== undefined ? fieldConfig.min : (fieldConfig.type === 'number' ? '0' : undefined)}
+                                          max={fieldConfig.max !== undefined ? fieldConfig.max : undefined}
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                  
+                                  {/* Second row: DateTime fields stacked vertically */}
+                                  {getDataEntryFields(testCase).filter(fieldConfig => 
+                                    fieldConfig.type === 'datetime-local'
+                                  ).map((fieldConfig, index) => (
+                                    <div key={`datetime-${index}`}>
                                       <label className="block text-xs font-medium text-gray-700 mb-1">
                                         {fieldConfig.label}
                                       </label>
@@ -731,12 +985,7 @@ const Testing = ({ currentUser }) => {
                                         placeholder={fieldConfig.placeholder || fieldConfig.label}
                                         value={chVtData[testCase.uniqueTestId || testCase.testId]?.[fieldConfig.name] || ''}
                                         onChange={(e) => handleChVtDataChange(testCase.uniqueTestId || testCase.testId, fieldConfig.name, e.target.value)}
-                                        className={`px-2 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500 ${
-                                          fieldConfig.type === 'datetime-local' ? 'w-40' : 
-                                          fieldConfig.type === 'date' ? 'w-28' : 
-                                          fieldConfig.type === 'number' ? 'w-24' : 'w-20'
-                                        }`}
-                                        min={fieldConfig.type === 'number' ? '0' : undefined}
+                                        className="px-2 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500 w-44"
                                       />
                                     </div>
                                   ))}
@@ -758,7 +1007,7 @@ const Testing = ({ currentUser }) => {
                   ) && (
                   <div className="border-t border-gray-200 bg-gray-50 p-4">
                     <div className="flex items-center justify-between mb-3">
-                      <h5 className="font-medium text-gray-900">🏭 Cell Hardening</h5>
+                      <h5 className="font-medium text-gray-900">Cell Hardening</h5>
                       <button
                         onClick={() => toggleHardeningForm(group.cellType, group.cellName)}
                         className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"

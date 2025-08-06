@@ -48,6 +48,7 @@ class TestCasesController {
   async getTestCasesBySite(req, res) {
     try {
       const { site } = req.params;
+      const { phase } = req.query; // Get phase from query parameters
       
       if (!site) {
         return res.status(400).json({
@@ -58,7 +59,12 @@ class TestCasesController {
       
       // Get test status for the specific site
       const testStatus = excelService.readTestStatus();
-      const siteTestCases = testStatus.filter(ts => ts.site === site);
+      let siteTestCases = testStatus.filter(ts => ts.site === site);
+      
+      // If phase is provided, filter by both site and phase
+      if (phase) {
+        siteTestCases = siteTestCases.filter(ts => ts.phase === phase);
+      }
       
       // Get all test cases
       const allTestCases = excelService.readTestCases();
@@ -70,9 +76,17 @@ class TestCasesController {
       const configuredCellTypes = [...new Set(siteTestCases.map(ts => ts.cellType))];
       
       // Filter test cases to only include those for configured cell types
-      const relevantTestCases = allTestCases.filter(tc => 
-        configuredCellTypes.includes(tc.cellType) || tc.scope === 'System'
-      );
+      // AND only include System scope test cases for cell types that were actually configured
+      // AND only include test cases that have existing entries in the test status
+      const relevantTestCases = allTestCases.filter(tc => {
+        // Check if this test case has an existing entry in the test status for this site-phase
+        const hasExistingEntry = siteTestCases.some(ts => 
+          ts.cellType === tc.cellType && 
+          ts.testCase === tc.testCase
+        );
+        
+        return hasExistingEntry;
+      });
       
       // Group test cases by scope and cell type (dynamic)
       const groupedData = {};
@@ -80,11 +94,15 @@ class TestCasesController {
       // Initialize groupedData dynamically based on available scopes
       const availableScopes = [...new Set(relevantTestCases.map(tc => tc.scope || 'Cell'))];
       availableScopes.forEach(scope => {
-        groupedData[scope.toLowerCase()] = {};
+        if (scope) {
+          groupedData[scope.toLowerCase()] = {};
+        }
       });
       
       // Process each relevant test case based on its scope
       relevantTestCases.forEach(tc => {
+        if (!tc) return; // Skip if test case is null/undefined
+        
         const scope = tc.scope || 'Cell';
         const cellType = tc.cellType;
         const phase = tc.phase || 'All';
@@ -92,6 +110,9 @@ class TestCasesController {
         if (scope === 'System') {
           // System scope: one block per cell type per site-phase combination
           const key = `${cellType}_${phase}`;
+          if (!groupedData.system) {
+            groupedData.system = {};
+          }
           if (!groupedData.system[key]) {
             groupedData.system[key] = {
               cellType,
@@ -102,19 +123,21 @@ class TestCasesController {
           }
           groupedData.system[key].testCases.push(tc);
         } else {
-          // For any other scope (Cell, Safety, or new scopes), only include if this cell type has configured cells
-          if (configuredCellTypes.includes(cellType)) {
-            const key = `${cellType}_${phase}`;
-            if (!groupedData[scope.toLowerCase()][key]) {
-              groupedData[scope.toLowerCase()][key] = {
-                cellType,
-                phase,
-                testCases: [],
-                scope
-              };
-            }
-            groupedData[scope.toLowerCase()][key].testCases.push(tc);
+          // For any other scope (Cell, Safety, or new scopes)
+          const scopeKey = scope.toLowerCase();
+          if (!groupedData[scopeKey]) {
+            groupedData[scopeKey] = {};
           }
+          const key = `${cellType}_${phase}`;
+          if (!groupedData[scopeKey][key]) {
+            groupedData[scopeKey][key] = {
+              cellType,
+              phase,
+              testCases: [],
+              scope
+            };
+          }
+          groupedData[scopeKey][key].testCases.push(tc);
         }
       });
       
@@ -122,45 +145,54 @@ class TestCasesController {
       const mappedTestCases = [];
       
       // Process System scope test cases
-      Object.values(groupedData.system).forEach(group => {
-        group.testCases.forEach(tc => {
-          const testId = `${site}_${tc.cellType}_${tc.testId}_${tc.testCase}`.replace(/\s+/g, '_');
+      if (groupedData.system) {
+        Object.values(groupedData.system).forEach(group => {
+          if (!group || !group.testCases) return;
           
-          // Find existing status entry
-          const existingEntry = siteTestCases.find(ts => 
-            ts.cellType === tc.cellType && 
-            ts.testCase === tc.testCase && 
-            ts.scope === 'System'
-          );
-          
-          // Only include if entry exists
-          if (existingEntry) {
-            mappedTestCases.push({
-              ...tc,
-              testId: existingEntry.testId, // Original test ID
-              uniqueTestId: existingEntry.uniqueTestId, // Unique test ID for matching
-              status: existingEntry.status,
-              cell: 'SYSTEM',
-              phase: tc.phase,
-              lastModified: existingEntry.lastModified,
-              modifiedUser: existingEntry.modifiedUser,
-              scope: 'System',
-              // Add CH/VT data
-              chVolume: existingEntry.chVolume || '',
-              chDate: existingEntry.chDate || '',
-              vtVolume: existingEntry.vtVolume || '',
-              vtStartDateTime: existingEntry.vtStartDateTime || '',
-              vtEndDateTime: existingEntry.vtEndDateTime || ''
-            });
-          }
+          group.testCases.forEach(tc => {
+            const testId = `${site}_${tc.cellType}_${tc.testId}_${tc.testCase}`.replace(/\s+/g, '_');
+            
+            // Find existing status entry
+            const existingEntry = siteTestCases.find(ts => 
+              ts.cellType === tc.cellType && 
+              ts.testCase === tc.testCase && 
+              ts.scope === 'System'
+            );
+            
+            // Only include if entry exists
+            if (existingEntry) {
+              mappedTestCases.push({
+                ...tc,
+                testId: existingEntry.testId, // Original test ID
+                uniqueTestId: existingEntry.uniqueTestId, // Unique test ID for matching
+                status: existingEntry.status,
+                cell: 'SYSTEM',
+                phase: tc.phase,
+                lastModified: existingEntry.lastModified,
+                modifiedUser: existingEntry.modifiedUser,
+                scope: 'System',
+                // Add CH/VT data
+                chVolume: existingEntry.chVolume || '',
+                chDate: existingEntry.chDate || '',
+                vtVolume: existingEntry.vtVolume || '',
+                vtStartDateTime: existingEntry.vtStartDateTime || '',
+                vtEndDateTime: existingEntry.vtEndDateTime || '',
+                vtAvailability: existingEntry.vtAvailability || ''
+              });
+            }
+          });
         });
-      });
+      }
       
       // Process all non-System scope test cases dynamically
       const nonSystemScopes = Object.keys(groupedData).filter(scope => scope !== 'system');
       
       for (const scopeType of nonSystemScopes) {
+        if (!groupedData[scopeType]) continue; // Skip if scope doesn't exist
+        
         for (const group of Object.values(groupedData[scopeType])) {
+          if (!group || !group.testCases) continue; // Skip if group is invalid
+          
           // Get the configured cells for this cell type
           const cellTypeCells = configuredCells.filter(cell => 
             siteTestCases.some(ts => ts.cellType === group.cellType && ts.cell === cell)
@@ -195,7 +227,8 @@ class TestCasesController {
                   chDate: existingEntry.chDate || '',
                   vtVolume: existingEntry.vtVolume || '',
                   vtStartDateTime: existingEntry.vtStartDateTime || '',
-                  vtEndDateTime: existingEntry.vtEndDateTime || ''
+                  vtEndDateTime: existingEntry.vtEndDateTime || '',
+                  vtAvailability: existingEntry.vtAvailability || ''
                 });
               }
             }
@@ -213,6 +246,7 @@ class TestCasesController {
       
     } catch (error) {
       console.error('Error getting test cases by site:', error);
+      console.error('Error stack:', error.stack);
       res.status(500).json({
         success: false,
         message: 'Error getting test cases for site',
@@ -292,13 +326,15 @@ class TestCasesController {
           config.fields = [
             { name: 'volume', label: 'VT Volume', type: 'number', placeholder: 'VT Volume' },
             { name: 'startDateTime', label: 'Start', type: 'datetime-local' },
-            { name: 'endDateTime', label: 'End', type: 'datetime-local' }
+            { name: 'endDateTime', label: 'End', type: 'datetime-local' },
+            { name: 'availability', label: 'Availability %', type: 'number', placeholder: 'Availability %', min: 0, max: 100 }
           ];
           config.statusRequired = true;
           config.fieldMappings = {
-            volume: 'volume', // Maps to VT Volume in backend
-            startDateTime: 'startDateTime', // Maps to VT Start DateTime in backend
-            endDateTime: 'endDateTime' // Maps to VT End DateTime in backend
+            volume: 'vtVolume', // Maps to VT Volume in backend
+            startDateTime: 'vtStartDateTime', // Maps to VT Start DateTime in backend
+            endDateTime: 'vtEndDateTime', // Maps to VT End DateTime in backend
+            availability: 'availability' // Maps to availability in backend
           };
         }
         

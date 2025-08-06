@@ -12,7 +12,10 @@ const api = axios.create({
 // Test Cases API
 export const testCasesAPI = {
   getAll: () => api.get('/test-cases'),
-  getBySite: (site) => api.get(`/test-cases/site/${site}`),
+  getBySite: (site, phase) => {
+    const params = phase ? { phase } : {};
+    return api.get(`/test-cases/site/${site}`, { params });
+  },
   getCellTypes: () => api.get('/test-cases/cell-types'),
   getSites: () => api.get('/test-cases/sites'),
   getConfigurations: () => api.get(`${API_BASE_URL}/test-cases/configurations`)
