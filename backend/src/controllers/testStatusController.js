@@ -34,7 +34,7 @@ class TestStatusController {
     console.log('Request body:', JSON.stringify(req.body, null, 2));
     
     try {
-      const { testId, cell, cellType, site, status, lastModified, modifiedUser, day, date, productionNumber, notes, volume, startDateTime, endDateTime, availability, vtVolume, vtStartDateTime, vtEndDateTime } = req.body;
+      const { testId, cell, cellType, site, status, lastModified, modifiedUser, day, date, productionNumber, notes, volume, startTime, endTime, availability, vtVolume, vtDate, vtStartTime, vtEndTime } = req.body;
       
       if (!testId) {
         return res.status(400).json({
@@ -99,17 +99,20 @@ class TestStatusController {
           if (vtVolume !== undefined) {
             updatedEntry.vtVolume = vtVolume;
           }
-          if (startDateTime !== undefined) {
-            updatedEntry.vtStartDateTime = startDateTime;
+          if (vtDate !== undefined) {
+            updatedEntry.vtDate = vtDate;
           }
-          if (vtStartDateTime !== undefined) {
-            updatedEntry.vtStartDateTime = vtStartDateTime;
+          if (startTime !== undefined) {
+            updatedEntry.vtStartTime = startTime;
           }
-          if (endDateTime !== undefined) {
-            updatedEntry.vtEndDateTime = endDateTime;
+          if (vtStartTime !== undefined) {
+            updatedEntry.vtStartTime = vtStartTime;
           }
-          if (vtEndDateTime !== undefined) {
-            updatedEntry.vtEndDateTime = vtEndDateTime;
+          if (endTime !== undefined) {
+            updatedEntry.vtEndTime = endTime;
+          }
+          if (vtEndTime !== undefined) {
+            updatedEntry.vtEndTime = vtEndTime;
           }
           if (availability !== undefined) {
             updatedEntry.vtAvailability = availability;

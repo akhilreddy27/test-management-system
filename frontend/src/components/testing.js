@@ -27,6 +27,10 @@ const Testing = ({ currentUser }) => {
   // State for cell type searchable dropdown
   const [isCellTypeDropdownOpen, setIsCellTypeDropdownOpen] = useState(false);
   const [cellTypeSearchTerm, setCellTypeSearchTerm] = useState('');
+  
+  // State for help modal
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const [selectedTestCase, setSelectedTestCase] = useState(null);
 
   useEffect(() => {
     loadTestCaseConfigurations();
@@ -212,6 +216,16 @@ const Testing = ({ currentUser }) => {
   const getFieldMapping = (testCase, fieldName) => {
     const config = getTestCaseConfig(testCase);
     return config.fieldMappings?.[fieldName] || fieldName;
+  };
+
+  const openHelpModal = (testCase) => {
+    setSelectedTestCase(testCase);
+    setShowHelpModal(true);
+  };
+
+  const closeHelpModal = () => {
+    setShowHelpModal(false);
+    setSelectedTestCase(null);
   };
 
   const handleChVtDataChange = async (testId, field, value) => {
@@ -910,11 +924,22 @@ const Testing = ({ currentUser }) => {
                               <div>
                                 <div className="font-medium text-gray-900 flex items-center space-x-2">
                                   <span>{testCase.testCase}</span>
+                                  <button
+                                    onClick={() => openHelpModal(testCase)}
+                                    className="text-blue-500 hover:text-blue-700 transition-colors"
+                                    title="View test case details"
+                                  >
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                                    </svg>
+                                  </button>
+                                </div>
+                                <div className="flex items-center space-x-2 mt-1">
                                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${getScopeBadgeColor(testCase.scope)}`}>
                                     {testCase.scope}
                                   </span>
+                                  <span className="text-sm text-gray-500">{testCase.phase}</span>
                                 </div>
-                                <div className="text-sm text-gray-500">{testCase.phase}</div>
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -946,13 +971,13 @@ const Testing = ({ currentUser }) => {
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                               {hasDataEntryFields(testCase) ? (
                                 // Dynamic data entry fields based on test case configuration
-                                <div className="flex flex-col space-y-1">
-                                  {/* First row: Volume and Availability fields */}
-                                  <div className="flex space-x-2">
+                                <div className="flex space-x-6">
+                                  {/* Left stack: Date and Time fields */}
+                                  <div className="flex flex-col space-y-3">
                                     {getDataEntryFields(testCase).filter(fieldConfig => 
-                                      fieldConfig.type !== 'datetime-local'
+                                      fieldConfig.type === 'date' || fieldConfig.type === 'time'
                                     ).map((fieldConfig, index) => (
-                                      <div key={index}>
+                                      <div key={index} className="flex flex-col">
                                         <label className="block text-xs font-medium text-gray-700 mb-1">
                                           {fieldConfig.label}
                                         </label>
@@ -961,34 +986,33 @@ const Testing = ({ currentUser }) => {
                                           placeholder={fieldConfig.placeholder || fieldConfig.label}
                                           value={chVtData[testCase.uniqueTestId || testCase.testId]?.[fieldConfig.name] || ''}
                                           onChange={(e) => handleChVtDataChange(testCase.uniqueTestId || testCase.testId, fieldConfig.name, e.target.value)}
-                                          className={`px-2 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500 ${
-                                            fieldConfig.type === 'date' ? 'w-24' : 
-                                            fieldConfig.type === 'number' ? 'w-20' : 'w-20'
-                                          }`}
+                                          className="px-2 py-1.5 h-8 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500 w-24"
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                  
+                                  {/* Right stack: Volume and Availability fields */}
+                                  <div className="flex flex-col space-y-3">
+                                    {getDataEntryFields(testCase).filter(fieldConfig => 
+                                      fieldConfig.type === 'number'
+                                    ).map((fieldConfig, index) => (
+                                      <div key={index} className="flex flex-col">
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                          {fieldConfig.label}
+                                        </label>
+                                        <input
+                                          type={fieldConfig.type}
+                                          placeholder={fieldConfig.placeholder || fieldConfig.label}
+                                          value={chVtData[testCase.uniqueTestId || testCase.testId]?.[fieldConfig.name] || ''}
+                                          onChange={(e) => handleChVtDataChange(testCase.uniqueTestId || testCase.testId, fieldConfig.name, e.target.value)}
+                                          className="px-2 py-1.5 h-8 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500 w-24"
                                           min={fieldConfig.min !== undefined ? fieldConfig.min : (fieldConfig.type === 'number' ? '0' : undefined)}
                                           max={fieldConfig.max !== undefined ? fieldConfig.max : undefined}
                                         />
                                       </div>
                                     ))}
                                   </div>
-                                  
-                                  {/* Second row: DateTime fields stacked vertically */}
-                                  {getDataEntryFields(testCase).filter(fieldConfig => 
-                                    fieldConfig.type === 'datetime-local'
-                                  ).map((fieldConfig, index) => (
-                                    <div key={`datetime-${index}`}>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                                        {fieldConfig.label}
-                                      </label>
-                                      <input
-                                        type={fieldConfig.type}
-                                        placeholder={fieldConfig.placeholder || fieldConfig.label}
-                                        value={chVtData[testCase.uniqueTestId || testCase.testId]?.[fieldConfig.name] || ''}
-                                        onChange={(e) => handleChVtDataChange(testCase.uniqueTestId || testCase.testId, fieldConfig.name, e.target.value)}
-                                        className="px-2 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500 w-44"
-                                      />
-                                    </div>
-                                  ))}
                                 </div>
                               ) : (
                                 // No actions for regular test cases - status is handled by dropdown
@@ -1135,6 +1159,64 @@ const Testing = ({ currentUser }) => {
             <div className="text-4xl mb-4">📋</div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">No Test Cases Found</h3>
             <p className="text-gray-600">Select a site to view available test cases.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Help Modal */}
+      {showHelpModal && selectedTestCase && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">
+                Test Case Details: {selectedTestCase.testCase}
+              </h3>
+              <button
+                onClick={closeHelpModal}
+                className="text-gray-400 hover:text-gray-600 text-xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              {/* Steps to Perform */}
+              {selectedTestCase.steps && (
+                <div>
+                  <h4 className="font-medium text-gray-900 text-base mb-3">Steps to Perform:</h4>
+                  <div className="bg-gray-50 p-4 rounded-lg text-sm text-gray-700 whitespace-pre-wrap border">
+                    {selectedTestCase.steps}
+                  </div>
+                </div>
+              )}
+              
+              {/* Expected Output */}
+              {selectedTestCase.expectedOutput && (
+                <div>
+                  <h4 className="font-medium text-gray-900 text-base mb-3">Expected Output:</h4>
+                  <div className="bg-gray-50 p-4 rounded-lg text-sm text-gray-700 whitespace-pre-wrap border">
+                    {selectedTestCase.expectedOutput}
+                  </div>
+                </div>
+              )}
+              
+              {/* Show message if no details available */}
+              {!selectedTestCase.steps && !selectedTestCase.expectedOutput && (
+                <div className="text-center py-8">
+                  <div className="text-gray-500 text-lg mb-2">📝</div>
+                  <p className="text-gray-600">No additional details available for this test case.</p>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex justify-end p-6 border-t border-gray-200">
+              <button
+                onClick={closeHelpModal}
+                className="px-4 py-2 bg-gray-600 text-white rounded text-sm hover:bg-gray-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

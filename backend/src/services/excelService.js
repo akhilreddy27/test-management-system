@@ -65,8 +65,9 @@ class ExcelService {
         // Cell hardening columns (removed old 3-day columns)
         // Volume Test columns
         vtVolume: row['VT Volume'] || '',
-        vtStartDateTime: row['VT Start DateTime'] || '',
-        vtEndDateTime: row['VT End DateTime'] || '',
+        vtDate: row['VT Date'] || '',
+        vtStartTime: row['VT Start Time'] || '',
+        vtEndTime: row['VT End Time'] || '',
         vtAvailability: row['VT Availability'] || '',
         // Cell Hardening columns
         chVolume: row['CH Volume'] || '',
@@ -99,8 +100,9 @@ class ExcelService {
         // Cell hardening columns (removed old 3-day columns)
         // Volume Test columns
         'VT Volume': entry.vtVolume || '',
-        'VT Start DateTime': entry.vtStartDateTime || '',
-        'VT End DateTime': entry.vtEndDateTime || '',
+        'VT Date': entry.vtDate || '',
+        'VT Start Time': entry.vtStartTime || '',
+        'VT End Time': entry.vtEndTime || '',
         'VT Availability': entry.vtAvailability || '',
         // Cell Hardening columns
         'CH Volume': entry.chVolume || '',

@@ -325,15 +325,17 @@ class TestCasesController {
           config.hasDataEntry = true;
           config.fields = [
             { name: 'volume', label: 'VT Volume', type: 'number', placeholder: 'VT Volume' },
-            { name: 'startDateTime', label: 'Start', type: 'datetime-local' },
-            { name: 'endDateTime', label: 'End', type: 'datetime-local' },
+            { name: 'date', label: 'Date', type: 'date' },
+            { name: 'startTime', label: 'Start Time', type: 'time' },
+            { name: 'endTime', label: 'End Time', type: 'time' },
             { name: 'availability', label: 'Availability %', type: 'number', placeholder: 'Availability %', min: 0, max: 100 }
           ];
           config.statusRequired = true;
           config.fieldMappings = {
             volume: 'vtVolume', // Maps to VT Volume in backend
-            startDateTime: 'vtStartDateTime', // Maps to VT Start DateTime in backend
-            endDateTime: 'vtEndDateTime', // Maps to VT End DateTime in backend
+            date: 'vtDate', // Maps to VT Date in backend
+            startTime: 'vtStartTime', // Maps to VT Start Time in backend
+            endTime: 'vtEndTime', // Maps to VT End Time in backend
             availability: 'availability' // Maps to availability in backend
           };
         }

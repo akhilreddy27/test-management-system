@@ -57,8 +57,9 @@ class SetupController {
               chVolume: '',
               chDate: '',
               vtVolume: '',
-              vtStartDateTime: '',
-              vtEndDateTime: '',
+              vtDate: '',
+              vtStartTime: '',
+              vtEndTime: '',
               vtAvailability: ''
             });
           });
@@ -91,8 +92,9 @@ class SetupController {
           chVolume: '',
           chDate: '',
           vtVolume: '',
-          vtStartDateTime: '',
-          vtEndDateTime: '',
+          vtDate: '',
+          vtStartTime: '',
+          vtEndTime: '',
           vtAvailability: ''
         });
       });
