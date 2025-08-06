@@ -26,7 +26,9 @@ class ExcelService {
         testCase: row['Test Case'],
         testId: row['Test ID'],
         scope: row['Scope'],
-        phase: row['Phase']
+        phase: row['Phase'],
+        steps: row['Steps'] || '',
+        expectedOutput: row['Expected Output'] || ''
       }));
       
     } catch (error) {
