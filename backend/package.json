@@ -1,16 +1,23 @@
 {
-  "name": "backend",
+  "name": "test-management-backend",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "Backend API for Test Management System",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+    "start": "node start.js",
+    "dev": "nodemon start.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "test-management",
+    "api",
+    "express",
+    "excel"
+  ],
+  "author": "Test Management Team",
   "license": "ISC",
-  "description": "",
   "dependencies": {
+    "axios": "^1.11.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "multer": "^2.0.2",
@@ -18,5 +25,8 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
+  },
+  "engines": {
+    "node": ">=14.0.0"
   }
 }

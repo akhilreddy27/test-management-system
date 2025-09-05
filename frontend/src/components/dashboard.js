@@ -1,40 +1,132 @@
 import React, { useState, useEffect } from 'react';
-import { testStatusAPI } from '../services/api';
+import { testStatusAPI, setupAPI } from '../services/api';
 
 const Dashboard = () => {
-  const [statistics, setStatistics] = useState({
-    totalTests: 0,
-    passedTests: 0,
-    failedTests: 0,
-    notRunTests: 0,
-    testCasesByCellType: {}
+  const [selectedSite, setSelectedSite] = useState('');
+  const [availableSites, setAvailableSites] = useState([]);
+  const [dashboardData, setDashboardData] = useState({
+    cells: [],
+    statistics: {
+      total: 0,
+      notRun: 0,
+      pass: 0,
+      fail: 0,
+      blocked: 0
+    }
   });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    loadStatistics();
+    loadSites();
   }, []);
 
-  const loadStatistics = async () => {
+  useEffect(() => {
+    if (selectedSite) {
+      loadDashboardData(selectedSite);
+    }
+  }, [selectedSite]);
+
+  const loadSites = async () => {
     try {
-      const response = await testStatusAPI.getStatistics();
-      if (response.data.success) {
-        const { overall, grouped } = response.data.data;
-        setStatistics({
-          totalTests: overall.totalTests || 0,
-          passedTests: overall.passCount || 0,
-          failedTests: overall.failCount || 0,
-          notRunTests: overall.notRunCount || 0,
-          testCasesByCellType: grouped?.byCellType || {}
+      const response = await setupAPI.getSites();
+      const sitesData = response.data.data;
+      const sitePhaseCombinations = [];
+      
+      Object.keys(sitesData).forEach(siteName => {
+        Object.keys(sitesData[siteName]).forEach(phaseName => {
+          sitePhaseCombinations.push(`${siteName} - ${phaseName}`);
         });
+      });
+      
+      setAvailableSites(sitePhaseCombinations);
+      if (sitePhaseCombinations.length > 0) {
+        setSelectedSite(sitePhaseCombinations[0]);
       }
     } catch (error) {
-      console.error('Error loading statistics:', error);
+      console.error('Error loading sites:', error);
+      setError('Failed to load available sites');
     }
   };
 
-  const getPassRate = () => {
-    if (statistics.totalTests === 0) return 0;
-    return Math.round((statistics.passedTests / statistics.totalTests) * 100);
+  const loadDashboardData = async (sitePhaseCombination) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const [site, phase] = sitePhaseCombination.split(' - ');
+      
+      // Get test status data for the selected site
+      const testStatusResponse = await testStatusAPI.getAll();
+      const allTestStatus = testStatusResponse.data.data;
+      
+      // Filter by site and phase
+      const siteTestStatus = allTestStatus.filter(ts => 
+        ts.site === site && ts.phase === phase
+      );
+
+      // Get unique cells for this site
+      const uniqueCells = [...new Set(siteTestStatus.map(ts => ts.cell))].filter(Boolean).sort();
+      
+      // Calculate statistics for each cell
+      const cellStatistics = uniqueCells.map(cell => {
+        const cellTests = siteTestStatus.filter(ts => ts.cell === cell);
+        
+        const stats = {
+          cell,
+          total: cellTests.length,
+          notRun: cellTests.filter(ts => ts.status === 'NOT RUN').length,
+          pass: cellTests.filter(ts => ts.status === 'PASS').length,
+          fail: cellTests.filter(ts => ts.status === 'FAIL').length,
+          blocked: cellTests.filter(ts => ts.status === 'BLOCKED').length
+        };
+        
+        return stats;
+      });
+
+      // Calculate overall statistics
+      const overallStats = {
+        total: siteTestStatus.length,
+        notRun: siteTestStatus.filter(ts => ts.status === 'NOT RUN').length,
+        pass: siteTestStatus.filter(ts => ts.status === 'PASS').length,
+        fail: siteTestStatus.filter(ts => ts.status === 'FAIL').length,
+        blocked: siteTestStatus.filter(ts => ts.status === 'BLOCKED').length
+      };
+
+      setDashboardData({
+        cells: cellStatistics,
+        statistics: overallStats
+      });
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+      setError('Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusColor = (status, count) => {
+    if (count === 0) return 'text-gray-400';
+    
+    switch (status) {
+      case 'pass': return 'text-green-600';
+      case 'fail': return 'text-red-600';
+      case 'blocked': return 'text-yellow-600';
+      case 'notRun': return 'text-gray-600';
+      default: return 'text-gray-600';
+    }
+  };
+
+  const getStatusBgColor = (status, count) => {
+    if (count === 0) return 'bg-gray-50';
+    
+    switch (status) {
+      case 'pass': return 'bg-green-50';
+      case 'fail': return 'bg-red-50';
+      case 'blocked': return 'bg-yellow-50';
+      case 'notRun': return 'bg-gray-50';
+      default: return 'bg-gray-50';
+    }
   };
 
   return (
@@ -47,25 +139,45 @@ const Dashboard = () => {
               Testing Dashboard
             </h1>
             <p className="text-gray-600">
-              Overview of your testing progress and statistics
+              Overview of test statistics by cell and site
             </p>
           </div>
-          <button
-            onClick={loadStatistics}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
-          >
-            Refresh Data
-          </button>
+          <div className="flex items-center space-x-4">
+            {/* Site Selector */}
+            <div className="relative">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Select Site
+              </label>
+              <select
+                value={selectedSite}
+                onChange={(e) => setSelectedSite(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              >
+                {availableSites.map((site) => (
+                  <option key={site} value={site}>
+                    {site}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={() => loadDashboardData(selectedSite)}
+              disabled={loading}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50"
+            >
+              {loading ? 'Loading...' : 'Refresh'}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Overall Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Tests</p>
-              <p className="text-2xl font-bold text-gray-900">{statistics.totalTests}</p>
+              <p className="text-2xl font-bold text-gray-900">{dashboardData.statistics.total}</p>
             </div>
             <div className="w-8 h-8 bg-blue-100 rounded-md flex items-center justify-center">
               <span className="text-blue-600 text-sm">📊</span>
@@ -76,8 +188,20 @@ const Dashboard = () => {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
+              <p className="text-sm font-medium text-gray-600">Not Run</p>
+              <p className="text-2xl font-bold text-gray-600">{dashboardData.statistics.notRun}</p>
+            </div>
+            <div className="w-8 h-8 bg-gray-100 rounded-md flex items-center justify-center">
+              <span className="text-gray-600 text-sm">⏸️</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
               <p className="text-sm font-medium text-gray-600">Passed</p>
-              <p className="text-2xl font-bold text-green-600">{statistics.passedTests}</p>
+              <p className="text-2xl font-bold text-green-600">{dashboardData.statistics.pass}</p>
             </div>
             <div className="w-8 h-8 bg-green-100 rounded-md flex items-center justify-center">
               <span className="text-green-600 text-sm">✅</span>
@@ -89,7 +213,7 @@ const Dashboard = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Failed</p>
-              <p className="text-2xl font-bold text-red-600">{statistics.failedTests}</p>
+              <p className="text-2xl font-bold text-red-600">{dashboardData.statistics.fail}</p>
             </div>
             <div className="w-8 h-8 bg-red-100 rounded-md flex items-center justify-center">
               <span className="text-red-600 text-sm">❌</span>
@@ -100,100 +224,109 @@ const Dashboard = () => {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Not Run</p>
-              <p className="text-2xl font-bold text-gray-600">{statistics.notRunTests}</p>
+              <p className="text-sm font-medium text-gray-600">Blocked</p>
+              <p className="text-2xl font-bold text-yellow-600">{dashboardData.statistics.blocked}</p>
             </div>
-            <div className="w-8 h-8 bg-gray-100 rounded-md flex items-center justify-center">
-              <span className="text-gray-600 text-sm">⏸️</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Progress Overview */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Overall Progress</h3>
-        <div className="space-y-4">
-          <div>
-            <div className="flex justify-between text-sm text-gray-600 mb-2">
-              <span>Pass Rate</span>
-              <span>{getPassRate()}%</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${getPassRate()}%` }}
-              ></div>
+            <div className="w-8 h-8 bg-yellow-100 rounded-md flex items-center justify-center">
+              <span className="text-yellow-600 text-sm">🚫</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Test Cases by Cell Type */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Test Cases by Cell Type</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Object.entries(statistics.testCasesByCellType || {}).map(([cellType, stats]) => (
-            <div key={cellType} className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-gray-900">{cellType}</p>
-                  <p className="text-sm text-gray-600">{stats.total} test cases</p>
-                  <div className="flex space-x-2 mt-1">
-                    <span className="text-xs text-green-600">{stats.passed} ✅</span>
-                    <span className="text-xs text-red-600">{stats.failed} ❌</span>
-                    <span className="text-xs text-gray-600">{stats.notRun} ⏸️</span>
-                  </div>
-                </div>
-                <div className="w-6 h-6 bg-blue-600 rounded-md flex items-center justify-center">
-                  <span className="text-white text-xs font-semibold">{cellType}</span>
-                </div>
-              </div>
-            </div>
-          ))}
+      {/* Test Statistics Table */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Test Statistics by Cell
+          </h3>
         </div>
-        {(!statistics.testCasesByCellType || Object.keys(statistics.testCasesByCellType || {}).length === 0) && (
-          <div className="text-center py-8 text-gray-500">
-            <p>No test cases configured yet.</p>
-            <p className="text-sm">Use the Setup tab to configure your testing environment.</p>
+        
+        {loading && (
+          <div className="p-6 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-2 text-gray-600">Loading dashboard data...</p>
           </div>
         )}
-      </div>
 
-      {/* Quick Actions */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <button
-            onClick={() => window.location.href = '#testing'}
-            className="p-4 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors text-left"
-          >
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-blue-600 rounded-md flex items-center justify-center">
-                <span className="text-white text-sm">✅</span>
-              </div>
-              <div>
-                <p className="font-medium text-gray-900">Start Testing</p>
-                <p className="text-sm text-gray-600">Execute functional tests</p>
-              </div>
+        {error && (
+          <div className="p-6 text-center">
+            <div className="text-red-600 bg-red-50 p-4 rounded-md">
+              {error}
             </div>
-          </button>
+          </div>
+        )}
 
-          <button
-            onClick={() => window.location.href = '#setup'}
-            className="p-4 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors text-left"
-          >
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gray-600 rounded-md flex items-center justify-center">
-                <span className="text-white text-sm">⚙️</span>
-              </div>
-              <div>
-                <p className="font-medium text-gray-900">Setup Configuration</p>
-                <p className="text-sm text-gray-600">Configure sites and cells</p>
-              </div>
-            </div>
-          </button>
-        </div>
+        {!loading && !error && dashboardData.cells.length === 0 && (
+          <div className="p-6 text-center">
+            <p className="text-gray-500">No test data available for the selected site.</p>
+          </div>
+        )}
+
+        {!loading && !error && dashboardData.cells.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Cell Name
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Total
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Not Run
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Pass
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Fail
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Blocked
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {dashboardData.cells.map((cell) => (
+                  <tr key={cell.cell} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">
+                        {cell.cell}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <span className="text-sm font-medium text-gray-900">
+                        {cell.total}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBgColor('notRun', cell.notRun)} ${getStatusColor('notRun', cell.notRun)}`}>
+                        {cell.notRun}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBgColor('pass', cell.pass)} ${getStatusColor('pass', cell.pass)}`}>
+                        {cell.pass}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBgColor('fail', cell.fail)} ${getStatusColor('fail', cell.fail)}`}>
+                        {cell.fail}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBgColor('blocked', cell.blocked)} ${getStatusColor('blocked', cell.blocked)}`}>
+                        {cell.blocked}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

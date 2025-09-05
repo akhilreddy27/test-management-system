@@ -1,0 +1,33 @@
+{
+  "name": "test-management-system",
+  "version": "1.0.0",
+  "description": "Comprehensive Test Management System for Cell Testing",
+  "main": "start-system.js",
+  "scripts": {
+    "start": "node start-system.js",
+    "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm start\"",
+    "backend": "cd backend && npm start",
+    "frontend": "cd frontend && npm start",
+    "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "clean": "find . -name 'node_modules' -type d -prune -exec rm -rf '{}' + && find . -name '.DS_Store' -delete",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "test-management",
+    "cell-testing",
+    "excel-integration",
+    "react",
+    "nodejs",
+    "express"
+  ],
+  "author": "Test Management Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
+

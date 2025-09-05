@@ -1,195 +1,203 @@
-# Functional Testing App
+# Test Management System
 
-A comprehensive test management system built with React (frontend) and Node.js + Express (backend) that allows users to execute functional tests and track results using Excel files.
+A comprehensive test management system for managing test cases, cell types, and site configurations with dynamic driveway management.
 
-## 🚀 Features Implemented
+## Features
 
-### ✅ Backend Logic
-- **Site-based Test Case Loading**: Backend loads test cases from Excel files based on the selected site
-- **Excel File Integration**: Reads test cases from `test_cases.xlsx` and manages test status in `test_status.xlsx`
-- **Test Status Management**: Tracks PASS/FAIL status for each test case with timestamps and user information
-- **Results Submission**: Saves completed test results to separate Excel files with submission details
-- **Statistics API**: Provides real-time statistics on test completion and pass rates
+- **Test Case Management**: Create, update, and delete test cases with dynamic cell type support
+- **Site Configuration**: Configure sites with multiple cell types and phases
+- **Dynamic Driveway Management**: Support for multi-driveway cell types with configurable driveway counts
+- **Real-time Status Tracking**: Track test execution status across different sites and phases
+- **Searchable Dropdowns**: Enhanced UI with searchable site and cell type selectors
+- **Excel Integration**: Direct integration with Excel files for data persistence
 
-### ✅ Frontend Functionality
-- **Site Selection**: Users can select from available sites configured in the system
-- **Test Case Display**: Shows all test cases for the selected site in a clean table format
-- **PASS/FAIL Marking**: Interactive buttons to mark each test case as PASS or FAIL
-- **Submit Validation**: Submit button is only enabled when ALL tests are marked as PASS
-- **Real-time Updates**: Test status updates are saved immediately to the backend
-- **Results Export**: Completed test results are saved to timestamped Excel files
+## Project Structure
 
-### ✅ User Experience
-- **Modern UI**: Clean, responsive interface built with React and Tailwind CSS
-- **Loading States**: Proper loading indicators during API calls
-- **Error Handling**: User-friendly error messages and validation
-- **Progress Tracking**: Visual indicators showing test completion progress
-- **Statistics Dashboard**: Real-time overview of test execution status
-
-## 🏗️ Architecture
-
-### Backend (Node.js + Express)
 ```
-backend/
-├── server.js                 # Main server file
-├── src/
-│   ├── controllers/          # Business logic
-│   │   ├── testCasesController.js
-│   │   ├── testStatusController.js
-│   │   └── setupController.js
-│   ├── routes/              # API endpoints
-│   │   ├── testCases.js
-│   │   ├── testStatus.js
-│   │   └── setup.js
-│   └── services/            # Data layer
-│       └── excelService.js  # Excel file operations
-└── data/                    # Excel files
-    ├── test_cases.xlsx      # Master test cases
-    └── test_status.xlsx     # Test execution status
+test-management-system/
+├── backend/                 # Node.js/Express backend
+│   ├── data/               # Excel data files
+│   ├── src/
+│   │   ├── controllers/    # API controllers
+│   │   ├── routes/         # API routes
+│   │   ├── services/       # Business logic services
+│   │   └── middleware/     # Express middleware
+│   └── server.js           # Main server file
+├── frontend/               # React frontend
+│   ├── src/
+│   │   ├── components/     # React components
+│   │   ├── services/       # API service layer
+│   │   └── App.js          # Main app component
+│   └── public/             # Static assets
+└── README.md               # This file
 ```
 
-### Frontend (React)
-```
-frontend/
-├── src/
-│   ├── components/          # React components
-│   │   ├── dashboard.js     # Statistics overview
-│   │   ├── setup.js         # Site configuration
-│   │   └── testing.js       # Test execution interface
-│   ├── services/            # API integration
-│   │   └── api.js          # HTTP client
-│   └── App.js              # Main application
-```
-
-## 🔧 API Endpoints
-
-### Test Cases
-- `GET /api/test-cases` - Get all test cases (with optional site filter)
-- `GET /api/test-cases/site/:site` - Get test cases for specific site
-- `GET /api/test-cases/cell-types` - Get available cell types
-- `GET /api/test-cases/sites` - Get available sites
-
-### Test Status
-- `GET /api/test-status` - Get all test status
-- `PUT /api/test-status` - Update individual test status
-- `POST /api/test-status/submit` - Submit completed test results
-- `GET /api/test-status/statistics` - Get test statistics
-
-### Setup
-- `POST /api/setup/site` - Create new site configuration
-- `GET /api/setup/sites` - Get configured sites
-
-## 📊 How It Works
-
-1. **Site Selection**: User selects a site from the dropdown in the Testing tab
-2. **Test Loading**: Backend loads test cases from Excel files for the selected site
-3. **Test Execution**: User marks each test case as PASS or FAIL using the interface
-4. **Real-time Updates**: Each status change is immediately saved to the backend
-5. **Submit Validation**: Submit button only enables when all tests are marked PASS
-6. **Results Export**: On submit, results are saved to a timestamped Excel file
-
-## 🚀 Getting Started
-
-### Prerequisites
-- Node.js (v14 or higher)
-- npm or yarn
+## Quick Start
 
 ### Backend Setup
-```bash
-cd backend
-npm install
-npm start
-```
+
+1. Navigate to the backend directory:
+   ```bash
+   cd backend
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Start the server:
+   ```bash
+   npm start
+   ```
+
+   **Alternative**: Use the provided startup scripts:
+   - **macOS/Linux**: `./start-backend.sh`
+   - **Windows**: `start-backend.bat`
+
+The backend will run on `http://localhost:3005`
 
 ### Frontend Setup
-```bash
-cd frontend
-npm install
-npm start
-```
 
-### Access the Application
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:3001
+1. Navigate to the frontend directory:
+   ```bash
+   cd frontend
+   ```
 
-## 📁 Excel File Structure
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-### test_cases.xlsx
-Contains master test cases with columns:
-- Cell Type (A, B, C, D, MCP)
-- Test Case (Power On, Motors, etc.)
-- Case ID (A1001, B1001, etc.)
-- Scope (Each Cell, System)
+3. Start the development server:
+   ```bash
+   npm start
+   ```
 
-### test_status.xlsx
-Tracks test execution status with columns:
-- Site
-- Phase
-- Cell Type
-- Cell
-- Test Case
-- Case ID
-- Status (PASS/FAIL/NOT RUN)
-- Last Modified
-- Modified User
+The frontend will run on `http://localhost:3000`
 
-### test_results_[site]_[timestamp].xlsx
-Generated when tests are submitted, containing:
-- Submission details (ID, site, user, timestamp)
-- Test results summary
-- Individual test case results
+## Troubleshooting
 
-## 🎯 Key Features
+### Image Upload Issues
 
-### ✅ Submit Validation
-- Submit button is **only enabled** when ALL tests are marked as PASS
-- Clear visual feedback showing completion progress
-- Prevents incomplete submissions
+If you encounter "Error uploading image: Load failed" or similar errors:
 
-### ✅ Real-time Statistics
-- Dashboard shows live statistics from actual test data
-- Pass rates, completion rates, and test counts
-- Updates automatically as tests are executed
+1. **Ensure Backend is Running**: The backend server must be running for image uploads to work
+   ```bash
+   # Check if backend is running
+   curl http://localhost:3005/api/health
+   ```
 
-### ✅ Excel Integration
-- No database required - everything stored in Excel files
-- Easy to export and share results
-- Maintains audit trail with timestamps and user information
+2. **Start Backend Server**: If the backend is not running, start it:
+   ```bash
+   # Option 1: Manual start
+   cd backend && npm start
+   
+   # Option 2: Use startup script
+   ./start-backend.sh  # macOS/Linux
+   start-backend.bat   # Windows
+   ```
 
-### ✅ User-Friendly Interface
-- Clean, modern design with intuitive navigation
-- Responsive layout works on different screen sizes
-- Clear status indicators and progress tracking
+3. **Check Network**: Ensure the frontend can reach `http://localhost:3005`
 
-## 🔄 Workflow
+4. **File Permissions**: Ensure the `backend/data/images` and `backend/data/temp` directories exist and are writable
 
-1. **Setup**: Configure sites and test cases using the Setup tab
-2. **Testing**: Select a site and execute tests in the Testing tab
-3. **Monitoring**: View real-time statistics in the Dashboard tab
-4. **Results**: Completed test results are automatically saved to Excel files
+### Common Issues
 
-## 🛠️ Technical Implementation
+- **"Backend server is not running"**: Start the backend server first
+- **"Network error"**: Check if the backend is accessible at `http://localhost:3005`
+- **"File size too large"**: Images are limited to 10MB
+- **"Invalid file type"**: Only image files (PNG, JPG, GIF) are supported
 
-### Backend Highlights
-- **Excel Service**: Handles all Excel file operations using `xlsx` library
-- **Site-based Filtering**: Efficiently filters test cases by site
-- **Status Tracking**: Maintains test execution state with timestamps
-- **Results Export**: Generates detailed Excel reports for completed tests
+## API Endpoints
 
-### Frontend Highlights
-- **React Hooks**: Uses modern React patterns for state management
-- **API Integration**: Clean separation of concerns with dedicated API service
-- **Real-time Updates**: Immediate feedback for user actions
-- **Validation**: Client-side validation with server-side confirmation
+### Test Cases
+- `GET /api/test-cases` - Get all test cases
+- `GET /api/test-cases/site/:site` - Get test cases for a specific site
+- `POST /api/test-cases` - Create a new test case
+- `PUT /api/test-cases/:id` - Update a test case
+- `DELETE /api/test-cases/:id` - Delete a test case
 
-## 📈 Future Enhancements
+### Site Configuration
+- `GET /api/setup/site-options` - Get available site options
+- `POST /api/setup/site` - Create site configuration
+- `GET /api/setup/sites` - Get all configured sites
 
-- Test case templates and bulk operations
-- Advanced reporting and analytics
-- User authentication and role-based access
-- Integration with external test management systems
-- Mobile-responsive testing interface
+### Test Status
+- `GET /api/test-status` - Get test status data
+- `PUT /api/test-status` - Update test status
 
----
+### Cell Types
+- `GET /api/cell-types` - Get all cell types
+- `POST /api/cell-types` - Create a new cell type
+- `PUT /api/cell-types/:cellType` - Update a cell type
+- `DELETE /api/cell-types/:cellType` - Delete a cell type
 
-**Status**: ✅ **COMPLETE** - All requested features have been implemented and tested! 
+## Key Features
+
+### Dynamic Driveway Management
+- Support for multi-driveway cell types (e.g., FLIB with 2 driveways, gah with 4 driveways)
+- Automatic driveway configuration based on cell type settings
+- Dynamic UI that adapts to the number of driveways
+
+### Test Case Creation
+- Automatic creation of test status entries for all sites when a new test case is created
+- Support for different scopes (Cell, System, Safety, Hardening, Rate)
+- Integration with cell type configurations
+
+### Site Management
+- Searchable site dropdown with keyboard navigation
+- Support for multiple phases per site
+- Automatic test case generation for configured cell types
+
+## Data Files
+
+The system uses Excel files for data persistence:
+
+- `cell_types.xlsx` - Cell type configurations and driveway settings
+- `site_info.xlsx` - Site information (City, State, DC Number)
+- `test_cases.xlsx` - Test case definitions
+- `test_status.xlsx` - Test execution status and results
+
+## Development
+
+### Code Structure
+- **Controllers**: Handle HTTP requests and responses
+- **Services**: Business logic and data access
+- **Routes**: API endpoint definitions
+- **Components**: React UI components
+
+### Adding New Features
+1. Create/update the appropriate controller method
+2. Add the route in the routes file
+3. Update the frontend API service if needed
+4. Create/update React components for the UI
+
+## Troubleshooting
+
+### Common Issues
+
+1. **"Error loading site options"**: 
+   - Ensure the backend server is running on port 3005
+   - Check that `site_info.xlsx` exists and has data
+   - Clear browser cache and refresh
+
+2. **Test cases not appearing**:
+   - Verify that test cases exist in `test_cases.xlsx`
+   - Check that corresponding entries exist in `test_status.xlsx`
+   - Ensure the site is properly configured
+
+3. **Driveway configuration issues**:
+   - Verify cell type settings in `cell_types.xlsx`
+   - Check that `hasMultipleDriveways` and `numberOfDriveways` are set correctly
+
+## Contributing
+
+1. Follow the existing code structure
+2. Add appropriate error handling
+3. Update documentation for new features
+4. Test thoroughly before submitting changes
+
+## License
+
+This project is proprietary and confidential. 
