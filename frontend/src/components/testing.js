@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { testCasesAPI, testStatusAPI, setupAPI } from '../services/api';
 import { showSuccessToast, showErrorToast } from '../services/toastService';
 
@@ -16,6 +16,7 @@ const Testing = ({ currentUser }) => {
   const [expandedCellType, setExpandedCellType] = useState(null);
   const [expandedCell, setExpandedCell] = useState(null);
   const [expandedFirstCellTests, setExpandedFirstCellTests] = useState({});
+  const [expandedScopes, setExpandedScopes] = useState({});
   const [showHardeningForm, setShowHardeningForm] = useState({});
   const [hardeningFormData, setHardeningFormData] = useState({
     day: 1,
@@ -32,7 +33,7 @@ const Testing = ({ currentUser }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSiteIndex, setSelectedSiteIndex] = useState(-1);
   
-  // State for help modal
+  // State for Help modal
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [selectedTestCase, setSelectedTestCase] = useState(null);
 
@@ -69,6 +70,11 @@ const Testing = ({ currentUser }) => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isDropdownOpen]);
+
+  // Keep testCasesRef updated with latest testCases state
+  useEffect(() => {
+    testCasesRef.current = testCases;
+  }, [testCases]);
 
   const loadSites = async () => {
     try {
@@ -246,6 +252,556 @@ const Testing = ({ currentUser }) => {
     } catch (error) {
       console.error('Error updating note:', error);
       showErrorToast('Failed to update note');
+    }
+  };
+
+  // Debounce timer for API calls
+  const debounceTimers = useRef({});
+  // Store current values for debounced API calls
+  const currentValues = useRef({});
+  // Track ongoing API calls to prevent overlaps
+  const ongoingApiCalls = useRef({});
+  // Ref to access latest testCases state in debounced callbacks
+  const testCasesRef = useRef(testCases);
+
+  const handleHardeningVolumeChange = async (testId, volume) => {
+    try {
+      const testCase = testCases.find(tc => tc.testId === testId);
+      if (!testCase) {
+        throw new Error('Test case not found for volume update');
+      }
+
+      // Determine if this is CH or VT test
+      const isChTest = testId.startsWith('CH-');
+      const volumeField = isChTest ? 'chVolume' : 'vtVolume';
+      
+      // Store the current value for the debounced API call
+      currentValues.current[`${testId}-volume`] = {
+        testId, // Store testId instead of full testCase object
+        volume,
+        volumeField
+      };
+      
+      // Update local state immediately for responsive UI
+      setTestCases(prevTestCases => 
+        prevTestCases.map(tc => 
+          tc.testId === testId 
+            ? { ...tc, [volumeField]: volume }
+            : tc
+        )
+      );
+      
+      // Clear existing timer for this field
+      if (debounceTimers.current[`${testId}-volume`]) {
+        clearTimeout(debounceTimers.current[`${testId}-volume`]);
+      }
+      
+      // Set new timer to make API call after user stops typing
+      const apiKey = `${testId}-volume`;
+      debounceTimers.current[apiKey] = setTimeout(async () => {
+        try {
+          // Check if API call is already in progress
+          if (ongoingApiCalls.current[apiKey]) {
+            console.log('API call already in progress, skipping:', apiKey);
+            return;
+          }
+          
+          const storedData = currentValues.current[apiKey];
+          if (!storedData) {
+            console.error('No stored data found for API call');
+            return;
+          }
+
+          // Mark API call as in progress
+          ongoingApiCalls.current[apiKey] = true;
+
+          // IMPORTANT: Get the LATEST testCase from the current state via ref
+          const latestTestCases = testCasesRef.current;
+          const latestTestCase = latestTestCases.find(tc => tc.testId === storedData.testId);
+          if (!latestTestCase) {
+            console.error('Latest test case not found for API call:', storedData.testId);
+            return;
+          }
+
+          const response = await testStatusAPI.updateStatus(latestTestCase.uniqueTestId, {
+            [storedData.volumeField]: storedData.volume
+          });
+
+          if (response.success) {
+            console.log('Volume updated successfully:', storedData.volume);
+          } else {
+            // Don't revert state - just log error to avoid overwriting user's current input
+            console.error('API failed but keeping current UI state:', response.message || 'Failed to update volume');
+            showErrorToast(`Failed to save volume: ${response.message || 'Unknown error'}`);
+          }
+        } catch (error) {
+          console.error('Error updating volume:', error);
+          showErrorToast(`Failed to update volume: ${error.message}`);
+        } finally {
+          // Mark API call as complete
+          ongoingApiCalls.current[apiKey] = false;
+        }
+      }, 1000); // Wait 1000ms (1 second) after user stops typing
+      
+    } catch (error) {
+      console.error('Error updating volume:', error);
+      showErrorToast(`Failed to update volume: ${error.message}`);
+    }
+  };
+
+  const handleVtVolumeChange = async (testId, volume) => {
+    try {
+      // Store the current value for the debounced API call
+      currentValues.current[`${testId}-vtVolume`] = {
+        testId,
+        volume
+      };
+      
+      // Update local state immediately for responsive UI
+      setTestCases(prevTestCases => 
+        prevTestCases.map(tc => 
+          tc.testId === testId 
+            ? { ...tc, vtVolume: volume }
+            : tc
+        )
+      );
+      
+      // Clear existing timer for this field
+      if (debounceTimers.current[`${testId}-vtVolume`]) {
+        clearTimeout(debounceTimers.current[`${testId}-vtVolume`]);
+      }
+      
+      // Set new timer to make API call after user stops typing
+      const apiKey = `${testId}-vtVolume`;
+      debounceTimers.current[apiKey] = setTimeout(async () => {
+        try {
+          // Check if API call is already in progress
+          if (ongoingApiCalls.current[apiKey]) {
+            console.log('API call already in progress, skipping:', apiKey);
+            return;
+          }
+          
+          const storedData = currentValues.current[apiKey];
+          if (!storedData) {
+            console.error('No stored data found for VT volume API call');
+            return;
+          }
+
+          // Mark API call as in progress
+          ongoingApiCalls.current[apiKey] = true;
+
+          // IMPORTANT: Get the LATEST testCase from the current state via ref
+          const latestTestCases = testCasesRef.current;
+          const latestTestCase = latestTestCases.find(tc => tc.testId === storedData.testId);
+          if (!latestTestCase) {
+            console.error('Latest test case not found for VT volume API call:', storedData.testId);
+            return;
+          }
+
+          const response = await testStatusAPI.updateStatus(latestTestCase.uniqueTestId, {
+            vtVolume: storedData.volume
+          });
+
+          if (response.success) {
+            console.log('VT Volume updated successfully:', storedData.volume);
+          } else {
+            console.error('API failed but keeping current UI state:', response.message || 'Failed to update VT volume');
+            showErrorToast(`Failed to save VT volume: ${response.message || 'Unknown error'}`);
+          }
+        } catch (error) {
+          console.error('Error updating VT volume:', error);
+          showErrorToast(`Failed to update VT volume: ${error.message}`);
+        } finally {
+          ongoingApiCalls.current[apiKey] = false;
+        }
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Error updating VT volume:', error);
+      showErrorToast(`Failed to update VT volume: ${error.message}`);
+    }
+  };
+
+  const handleVtDateChange = async (testId, date) => {
+    try {
+      // Store the current value for the debounced API call
+      currentValues.current[`${testId}-vtDate`] = {
+        testId,
+        date
+      };
+      
+      // Update local state immediately for responsive UI
+      setTestCases(prevTestCases => 
+        prevTestCases.map(tc => 
+          tc.testId === testId 
+            ? { ...tc, vtDate: date }
+            : tc
+        )
+      );
+      
+      // Clear existing timer for this field
+      if (debounceTimers.current[`${testId}-vtDate`]) {
+        clearTimeout(debounceTimers.current[`${testId}-vtDate`]);
+      }
+      
+      // Set new timer to make API call after user stops typing
+      const apiKey = `${testId}-vtDate`;
+      debounceTimers.current[apiKey] = setTimeout(async () => {
+        try {
+          // Check if API call is already in progress
+          if (ongoingApiCalls.current[apiKey]) {
+            console.log('API call already in progress, skipping:', apiKey);
+            return;
+          }
+          
+          const storedData = currentValues.current[apiKey];
+          if (!storedData) {
+            console.error('No stored data found for VT date API call');
+            return;
+          }
+
+          // Mark API call as in progress
+          ongoingApiCalls.current[apiKey] = true;
+
+          // IMPORTANT: Get the LATEST testCase from the current state via ref
+          const latestTestCases = testCasesRef.current;
+          const latestTestCase = latestTestCases.find(tc => tc.testId === storedData.testId);
+          if (!latestTestCase) {
+            console.error('Latest test case not found for VT date API call:', storedData.testId);
+            return;
+          }
+
+          const response = await testStatusAPI.updateStatus(latestTestCase.uniqueTestId, {
+            vtDate: storedData.date
+          });
+
+          if (response.success) {
+            console.log('VT Date updated successfully:', storedData.date);
+          } else {
+            console.error('API failed but keeping current UI state:', response.message || 'Failed to update VT date');
+            showErrorToast(`Failed to save VT date: ${response.message || 'Unknown error'}`);
+          }
+        } catch (error) {
+          console.error('Error updating VT date:', error);
+          showErrorToast(`Failed to update VT date: ${error.message}`);
+        } finally {
+          ongoingApiCalls.current[apiKey] = false;
+        }
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Error updating VT date:', error);
+      showErrorToast(`Failed to update VT date: ${error.message}`);
+    }
+  };
+
+  const handleVtStartTimeChange = async (testId, startTime) => {
+    try {
+      // Store the current value for the debounced API call
+      currentValues.current[`${testId}-vtStartTime`] = {
+        testId,
+        startTime
+      };
+      
+      // Update local state immediately for responsive UI
+      setTestCases(prevTestCases => 
+        prevTestCases.map(tc => 
+          tc.testId === testId 
+            ? { ...tc, vtStartTime: startTime }
+            : tc
+        )
+      );
+      
+      // Clear existing timer for this field
+      if (debounceTimers.current[`${testId}-vtStartTime`]) {
+        clearTimeout(debounceTimers.current[`${testId}-vtStartTime`]);
+      }
+      
+      // Set new timer to make API call after user stops typing
+      const apiKey = `${testId}-vtStartTime`;
+      debounceTimers.current[apiKey] = setTimeout(async () => {
+        try {
+          // Check if API call is already in progress
+          if (ongoingApiCalls.current[apiKey]) {
+            console.log('API call already in progress, skipping:', apiKey);
+            return;
+          }
+          
+          const storedData = currentValues.current[apiKey];
+          if (!storedData) {
+            console.error('No stored data found for VT start time API call');
+            return;
+          }
+
+          // Mark API call as in progress
+          ongoingApiCalls.current[apiKey] = true;
+
+          // IMPORTANT: Get the LATEST testCase from the current state via ref
+          const latestTestCases = testCasesRef.current;
+          const latestTestCase = latestTestCases.find(tc => tc.testId === storedData.testId);
+          if (!latestTestCase) {
+            console.error('Latest test case not found for VT start time API call:', storedData.testId);
+            return;
+          }
+
+          const response = await testStatusAPI.updateStatus(latestTestCase.uniqueTestId, {
+            vtStartTime: storedData.startTime
+          });
+
+          if (response.success) {
+            console.log('VT Start Time updated successfully:', storedData.startTime);
+          } else {
+            console.error('API failed but keeping current UI state:', response.message || 'Failed to update VT start time');
+            showErrorToast(`Failed to save VT start time: ${response.message || 'Unknown error'}`);
+          }
+        } catch (error) {
+          console.error('Error updating VT start time:', error);
+          showErrorToast(`Failed to update VT start time: ${error.message}`);
+        } finally {
+          ongoingApiCalls.current[apiKey] = false;
+        }
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Error updating VT start time:', error);
+      showErrorToast(`Failed to update VT start time: ${error.message}`);
+    }
+  };
+
+  const handleVtEndTimeChange = async (testId, endTime) => {
+    try {
+      // Store the current value for the debounced API call
+      currentValues.current[`${testId}-vtEndTime`] = {
+        testId,
+        endTime
+      };
+      
+      // Update local state immediately for responsive UI
+      setTestCases(prevTestCases => 
+        prevTestCases.map(tc => 
+          tc.testId === testId 
+            ? { ...tc, vtEndTime: endTime }
+            : tc
+        )
+      );
+      
+      // Clear existing timer for this field
+      if (debounceTimers.current[`${testId}-vtEndTime`]) {
+        clearTimeout(debounceTimers.current[`${testId}-vtEndTime`]);
+      }
+      
+      // Set new timer to make API call after user stops typing
+      const apiKey = `${testId}-vtEndTime`;
+      debounceTimers.current[apiKey] = setTimeout(async () => {
+        try {
+          // Check if API call is already in progress
+          if (ongoingApiCalls.current[apiKey]) {
+            console.log('API call already in progress, skipping:', apiKey);
+            return;
+          }
+          
+          const storedData = currentValues.current[apiKey];
+          if (!storedData) {
+            console.error('No stored data found for VT end time API call');
+            return;
+          }
+
+          // Mark API call as in progress
+          ongoingApiCalls.current[apiKey] = true;
+
+          // IMPORTANT: Get the LATEST testCase from the current state via ref
+          const latestTestCases = testCasesRef.current;
+          const latestTestCase = latestTestCases.find(tc => tc.testId === storedData.testId);
+          if (!latestTestCase) {
+            console.error('Latest test case not found for VT end time API call:', storedData.testId);
+            return;
+          }
+
+          const response = await testStatusAPI.updateStatus(latestTestCase.uniqueTestId, {
+            vtEndTime: storedData.endTime
+          });
+
+          if (response.success) {
+            console.log('VT End Time updated successfully:', storedData.endTime);
+          } else {
+            console.error('API failed but keeping current UI state:', response.message || 'Failed to update VT end time');
+            showErrorToast(`Failed to save VT end time: ${response.message || 'Unknown error'}`);
+          }
+        } catch (error) {
+          console.error('Error updating VT end time:', error);
+          showErrorToast(`Failed to update VT end time: ${error.message}`);
+        } finally {
+          ongoingApiCalls.current[apiKey] = false;
+        }
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Error updating VT end time:', error);
+      showErrorToast(`Failed to update VT end time: ${error.message}`);
+    }
+  };
+
+  const handleVtAvailabilityChange = async (testId, availability) => {
+    console.log('VT Availability Change:', { testId, availability });
+    try {
+      // Store the current value for the debounced API call
+      currentValues.current[`${testId}-vtAvailability`] = {
+        testId,
+        availability
+      };
+      
+      // Update local state immediately for responsive UI
+      setTestCases(prevTestCases => 
+        prevTestCases.map(tc => 
+          tc.testId === testId 
+            ? { ...tc, vtAvailability: availability }
+            : tc
+        )
+      );
+      
+      // Clear existing timer for this field
+      if (debounceTimers.current[`${testId}-vtAvailability`]) {
+        clearTimeout(debounceTimers.current[`${testId}-vtAvailability`]);
+      }
+      
+      // Set new timer to make API call after user stops typing
+      const apiKey = `${testId}-vtAvailability`;
+      debounceTimers.current[apiKey] = setTimeout(async () => {
+        try {
+          // Check if API call is already in progress
+          if (ongoingApiCalls.current[apiKey]) {
+            console.log('API call already in progress, skipping:', apiKey);
+            return;
+          }
+          
+          const storedData = currentValues.current[apiKey];
+          if (!storedData) {
+            console.error('No stored data found for VT availability API call');
+            return;
+          }
+
+          // Mark API call as in progress
+          ongoingApiCalls.current[apiKey] = true;
+
+          // IMPORTANT: Get the LATEST testCase from the current state via ref
+          const latestTestCases = testCasesRef.current;
+          const latestTestCase = latestTestCases.find(tc => tc.testId === storedData.testId);
+          if (!latestTestCase) {
+            console.error('Latest test case not found for VT availability API call:', storedData.testId);
+            return;
+          }
+
+          console.log('Making VT Availability API call:', {
+            uniqueTestId: latestTestCase.uniqueTestId,
+            vtAvailability: storedData.availability
+          });
+          
+          const response = await testStatusAPI.updateStatus(latestTestCase.uniqueTestId, {
+            vtAvailability: storedData.availability
+          });
+
+          if (response.success) {
+            console.log('VT Availability updated successfully:', storedData.availability);
+          } else {
+            console.error('API failed but keeping current UI state:', response.message || 'Failed to update VT availability');
+            showErrorToast(`Failed to save VT availability: ${response.message || 'Unknown error'}`);
+          }
+        } catch (error) {
+          console.error('Error updating VT availability:', error);
+          showErrorToast(`Failed to update VT availability: ${error.message}`);
+        } finally {
+          ongoingApiCalls.current[apiKey] = false;
+        }
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Error updating VT availability:', error);
+      showErrorToast(`Failed to update VT availability: ${error.message}`);
+    }
+  };
+
+  const handleHardeningDateChange = async (testId, date) => {
+    try {
+      const testCase = testCases.find(tc => tc.testId === testId);
+      if (!testCase) {
+        throw new Error('Test case not found for date update');
+      }
+
+      // Determine if this is CH or VT test
+      const isChTest = testId.startsWith('CH-');
+      const dateField = isChTest ? 'chDate' : 'vtDate';
+      
+      // Store the current value for the debounced API call
+      currentValues.current[`${testId}-date`] = {
+        testId, // Store testId instead of full testCase object
+        date,
+        dateField
+      };
+      
+      // Update local state immediately for responsive UI
+      setTestCases(prevTestCases => 
+        prevTestCases.map(tc => 
+          tc.testId === testId 
+            ? { ...tc, [dateField]: date }
+            : tc
+        )
+      );
+      
+      // Clear existing timer for this field
+      if (debounceTimers.current[`${testId}-date`]) {
+        clearTimeout(debounceTimers.current[`${testId}-date`]);
+      }
+      
+      // Set new timer to make API call after user stops typing
+      const apiKey = `${testId}-date`;
+      debounceTimers.current[apiKey] = setTimeout(async () => {
+        try {
+          // Check if API call is already in progress
+          if (ongoingApiCalls.current[apiKey]) {
+            console.log('API call already in progress, skipping:', apiKey);
+            return;
+          }
+          
+          const storedData = currentValues.current[apiKey];
+          if (!storedData) {
+            console.error('No stored data found for date API call');
+            return;
+          }
+
+          // Mark API call as in progress
+          ongoingApiCalls.current[apiKey] = true;
+
+          // IMPORTANT: Get the LATEST testCase from the current state via ref
+          const latestTestCases = testCasesRef.current;
+          const latestTestCase = latestTestCases.find(tc => tc.testId === storedData.testId);
+          if (!latestTestCase) {
+            console.error('Latest test case not found for date API call:', storedData.testId);
+            return;
+          }
+
+          const response = await testStatusAPI.updateStatus(latestTestCase.uniqueTestId, {
+            [storedData.dateField]: storedData.date
+          });
+
+          if (response.success) {
+            console.log('Date updated successfully:', storedData.date);
+          } else {
+            // Don't revert state - just log error to avoid overwriting user's current input
+            console.error('API failed but keeping current UI state:', response.message || 'Failed to update date');
+            showErrorToast(`Failed to save date: ${response.message || 'Unknown error'}`);
+          }
+        } catch (error) {
+          console.error('Error updating date:', error);
+          showErrorToast(`Failed to update date: ${error.message}`);
+        } finally {
+          // Mark API call as complete
+          ongoingApiCalls.current[apiKey] = false;
+        }
+      }, 1000); // Wait 1000ms (1 second) after user stops typing
+      
+    } catch (error) {
+      console.error('Error updating date:', error);
+      showErrorToast(`Failed to update date: ${error.message}`);
     }
   };
 
@@ -431,25 +987,44 @@ const Testing = ({ currentUser }) => {
     if (expandedCell === key) {
       // If clicking the same cell, collapse it
       setExpandedCell(null);
+      setExpandedScopes({}); // Also collapse any expanded scopes
     } else {
-      // If clicking a different cell, expand it and collapse others
+      // If clicking a different cell, expand it and collapse ALL others
       setExpandedCell(key);
-      // Collapse any expanded first cell tests when expanding individual cells
-      setExpandedFirstCellTests(prev => ({
-        ...prev,
-        [cellType]: false
-      }));
+      // Collapse any expanded first cell tests from ANY cell type
+      setExpandedFirstCellTests({});
+      // Reset ALL scope expansions when changing cells
+      setExpandedScopes({});
     }
   };
 
   const toggleFirstCellTests = (cellType) => {
-    setExpandedFirstCellTests(prev => ({
-      ...prev,
-      [cellType]: !prev[cellType]
-    }));
-    // Collapse any expanded individual cells when expanding first cell tests
-    if (!expandedFirstCellTests[cellType]) {
-      setExpandedCell(null);
+    const isCurrentlyExpanded = expandedFirstCellTests[cellType];
+    
+    if (isCurrentlyExpanded) {
+      // If clicking the same "First cell only", collapse it
+      setExpandedFirstCellTests(prev => ({
+        ...prev,
+        [cellType]: false
+      }));
+    } else {
+      // If expanding "First cell only", collapse ALL other sections
+      setExpandedFirstCellTests({ [cellType]: true }); // Only this one expanded
+      setExpandedCell(null); // Collapse any individual cells
+      setExpandedScopes({}); // Collapse any scopes
+    }
+  };
+
+  const toggleScope = (cellType, cellName, scope) => {
+    const key = `${cellType}-${cellName}-${scope}`;
+    const isCurrentlyExpanded = expandedScopes[key];
+    
+    if (isCurrentlyExpanded) {
+      // If clicking the same scope, collapse it
+      setExpandedScopes({});
+    } else {
+      // If expanding a scope, collapse ALL other scopes and expand only this one
+      setExpandedScopes({ [key]: true });
     }
   };
 
@@ -491,6 +1066,7 @@ const Testing = ({ currentUser }) => {
     setExpandedCellType(null);
     setExpandedCell(null);
     setExpandedFirstCellTests({});
+    setExpandedScopes({});
     
     // Load phases for the selected site
     await loadPhasesForSite(site.value);
@@ -664,6 +1240,7 @@ const Testing = ({ currentUser }) => {
                   // Collapse all expanded items when phase changes
                   setExpandedCellType(null);
                   setExpandedCell(null);
+                  setExpandedScopes({});
                 }}
                 disabled={!selectedSite}
                 className={`w-full h-10 px-3 sm:px-4 border rounded-lg text-sm sm:text-base ${
@@ -751,15 +1328,15 @@ const Testing = ({ currentUser }) => {
                             >
                               <div className="flex items-center justify-between space-x-2 sm:space-x-4">
                                 <div className="flex items-center space-x-2 sm:space-x-3 w-full sm:w-auto">
-                                  <div className="text-left flex-1 min-w-0">
-                                    <h5 className="font-medium text-gray-900 text-sm leading-tight">
+                                <div className="text-left flex-1 min-w-0">
+                                  <h5 className="font-medium text-gray-900 text-sm leading-tight">
                                       First cell only
-                                    </h5>
-                                    <p className="text-xs text-gray-600 leading-tight">
-                                      {firstCellTestCases.length} test cases (test only on first cell)
-                                    </p>
-                                  </div>
+                                  </h5>
+                                  <p className="text-xs text-gray-600 leading-tight">
+                                    {firstCellTestCases.length} test cases (test only on first cell)
+                                  </p>
                                 </div>
+                              </div>
                                 
                                 <div className="flex items-center justify-between sm:justify-end space-x-2 sm:space-x-4 w-full sm:w-auto">
                                   {/* Status Summary for First Cell Test Cases */}
@@ -786,8 +1363,8 @@ const Testing = ({ currentUser }) => {
                                         </>
                                       );
                                     })()}
-                                  </div>
-                                  
+                            </div>
+                            
 
                                 </div>
                               </div>
@@ -796,158 +1373,394 @@ const Testing = ({ currentUser }) => {
                             {/* First Cell Test Cases Table - Expandable */}
                             {isExpanded && (
                               <div className="border-t border-gray-200 bg-white">
-                                {/* Mobile: Card Layout */}
-                                <div className="block sm:hidden">
-                                  <div className="divide-y divide-gray-200">
-                                    {firstCellTestCases.map((testCase, index) => (
-                                      <div key={testCase.testId} className="p-3 space-y-3">
-                                        <div className="flex items-start justify-between">
-                                          <div className="flex-1 min-w-0">
-                                            <div className="font-medium text-gray-900 text-sm flex items-center space-x-2">
-                                              <span className="truncate">{testCase.testCase}</span>
-                                              <button
-                                                onClick={() => openHelpModal(testCase)}
-                                                className="text-blue-500 hover:text-blue-700 transition-colors flex-shrink-0"
-                                                title="View test case details"
-                                              >
-                                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3 001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-                                                </svg>
-                                              </button>
-                                            </div>
-                                            {/* Scope Badge */}
-                                            <div className="mt-1">
-                                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getScopeBadgeColor(testCase.scope)}`}>
-                                                {testCase.scope}
-                                              </span>
-                                            </div>
+                              {/* Mobile: Card Layout */}
+                              <div className="block sm:hidden">
+                                <div className="divide-y divide-gray-200">
+                                  {firstCellTestCases.map((testCase, index) => (
+                                    <div key={testCase.testId} className="p-3 space-y-3">
+                                      <div className="flex items-start justify-between">
+                                        <div className="flex-1 min-w-0">
+                                          <div className="font-medium text-gray-900 text-sm">
+                                            <div className="truncate">{testCase.testCase}</div>
+                                            <button
+                                              onClick={() => openHelpModal(testCase)}
+                                              className="text-blue-500 hover:text-blue-700 transition-colors text-xs underline mt-1"
+                                              title="View test case details"
+                                            >
+                                              Help
+                                            </button>
+                                          </div>
+                                          {/* Scope Badge */}
+                                          <div className="mt-1">
+                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getScopeBadgeColor(testCase.scope)}`}>
+                                              {testCase.scope}
+                                            </span>
                                           </div>
                                         </div>
-                                        <div>
-                                          <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs font-mono">
-                                            {testCase.testId}
-                                          </span>
-                                        </div>
-                                        <div>
-                                          <select
-                                            value={testCase.status}
-                                            onChange={(e) => handleStatusChange(testCase.testId, e.target.value)}
-                                            className={`w-full px-2 py-2 rounded text-sm font-medium border focus:ring-1 focus:ring-blue-500 ${
-                                              testCase.status === 'PASS' ? 'bg-green-100 text-green-800 border-green-300' :
-                                              testCase.status === 'FAIL' ? 'bg-red-100 text-red-800 border-red-300' :
-                                              testCase.status === 'BLOCKED' ? 'bg-orange-100 text-orange-800 border-orange-300' :
-                                              testCase.status === 'NA' ? 'bg-slate-100 text-slate-800 border-slate-300' :
-                                              'bg-gray-100 text-gray-800 border-gray-300'
-                                            }`}
-                                          >
-                                            <option value="NOT RUN">⏸️ NOT RUN</option>
-                                            <option value="PASS">✅ PASS</option>
-                                            <option value="FAIL">❌ FAIL</option>
-                                            <option value="BLOCKED">🚫 BLOCKED</option>
-                                            <option value="NA">N/A</option>
-                                          </select>
-                                        </div>
-                                        <div>
-                                          <input
-                                            type="text"
-                                            value={testCaseNotes[testCase.testId] || ''}
-                                            onChange={(e) => handleNoteChange(testCase.testId, e.target.value)}
-                                            placeholder="Add notes..."
-                                            className="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                          />
-                                        </div>
                                       </div>
-                                    ))}
-                                  </div>
-                                </div>
-                                
-                                {/* Desktop Table Layout */}
-                                <div className="hidden sm:block">
-                                  <div className="overflow-x-auto">
-                                    <table className="min-w-full divide-y divide-gray-200">
-                                      <thead className="bg-gray-50">
-                                        <tr>
-                                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">
-                                            Test Case
-                                          </th>
-                                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
-                                            Test ID
-                                          </th>
-                                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
-                                            Status
-                                          </th>
-                                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">
-                                            Details
-                                          </th>
-                                        </tr>
-                                      </thead>
-                                      <tbody className="bg-white divide-y divide-gray-200">
-                                        {firstCellTestCases.map((testCase, index) => (
-                                          <tr key={testCase.testId} className="hover:bg-gray-50">
-                                            <td className="px-3 py-4 whitespace-nowrap">
-                                              <div className="flex items-center space-x-2">
-                                                <div className="flex-1 min-w-0">
-                                                  <div className="text-sm font-medium text-gray-900">
-                                                    {testCase.testCase}
-                                                  </div>
-                                                  {/* Scope Badge */}
-                                                  <div className="mt-1">
-                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getScopeBadgeColor(testCase.scope)}`}>
-                                                      {testCase.scope}
-                                                    </span>
-                                                  </div>
-                                                </div>
-                                                <button
-                                                  onClick={() => openHelpModal(testCase)}
-                                                  className="text-blue-500 hover:text-blue-700 transition-colors flex-shrink-0"
-                                                  title="View test case details"
-                                                >
-                                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3 001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-                                                  </svg>
-                                                </button>
-                                              </div>
-                                            </td>
-                                            <td className="px-3 py-4 whitespace-nowrap">
-                                              <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs font-mono">
-                                                {testCase.testId}
-                                              </span>
-                                            </td>
-                                            <td className="px-3 py-4 whitespace-nowrap">
-                                              <select
-                                                value={testCase.status}
-                                                onChange={(e) => handleStatusChange(testCase.testId, e.target.value)}
-                                                className={`px-2 py-1 rounded text-sm font-medium border focus:ring-1 focus:ring-blue-500 ${
-                                                  testCase.status === 'PASS' ? 'bg-green-100 text-green-800 border-green-300' :
-                                                  testCase.status === 'FAIL' ? 'bg-red-100 text-red-800 border-red-300' :
-                                                  testCase.status === 'BLOCKED' ? 'bg-orange-100 text-orange-800 border-orange-300' :
-                                                  testCase.status === 'NA' ? 'bg-slate-100 text-slate-800 border-slate-300' :
-                                                  'bg-gray-100 text-gray-800 border-gray-300'
-                                                }`}
-                                              >
-                                                <option value="NOT RUN">⏸️ NOT RUN</option>
-                                                <option value="PASS">✅ PASS</option>
-                                                <option value="FAIL">❌ FAIL</option>
-                                                <option value="BLOCKED">🚫 BLOCKED</option>
-                                                <option value="NA">N/A</option>
-                                              </select>
-                                            </td>
-                                            <td className="px-3 py-4 whitespace-nowrap">
-                                              <input
-                                                type="text"
-                                                value={testCaseNotes[testCase.testId] || ''}
-                                                onChange={(e) => handleNoteChange(testCase.testId, e.target.value)}
-                                                placeholder="Add notes..."
-                                                className="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                              />
-                                            </td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                  </div>
+                                      <div>
+                                        <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs font-mono">
+                                          {testCase.testId}
+                                        </span>
+                                      </div>
+                                      {/* Status, Hardening, or VT Inputs */}
+                                      {(() => {
+                                        // Debug logging
+                                        if (testCase.testId === 'VT-0001') {
+                                          console.log('VT-0001 Debug:', {
+                                            testId: testCase.testId,
+                                            scope: testCase.scope,
+                                            startsWithVT: testCase.testId.startsWith('VT-'),
+                                            testCase: testCase
+                                          });
+                                        }
+                                        return null;
+                                      })()}
+                                      {testCase.testId && testCase.testId.startsWith('CH-') && testCase.scope === 'Hardening' ? (
+                                        // Hardening test case - show volume and date inputs
+                                        <div className="space-y-3">
+                                          <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                              Volume
+                                            </label>
+                                            <input
+                                              type="text"
+                                              value={testCase.chVolume || ''}
+                                              onChange={(e) => handleHardeningVolumeChange(testCase.testId, e.target.value)}
+                                              placeholder="Enter volume"
+                                              className="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                              Date
+                                            </label>
+                                            <input
+                                              type="date"
+                                              value={testCase.chDate || ''}
+                                              onChange={(e) => handleHardeningDateChange(testCase.testId, e.target.value)}
+                                              className="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                            />
+                                          </div>
+                                        </div>
+                                      ) : testCase.testId && testCase.testId.startsWith('VT-') ? (
+                                        // VT test case - show volume, date, start time, end time, availability inputs + status
+                                        <div className="space-y-3">
+                                          <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                              Volume
+                                            </label>
+                                            <input
+                                              type="text"
+                                              value={testCase.vtVolume || ''}
+                                              onChange={(e) => handleVtVolumeChange(testCase.testId, e.target.value)}
+                                              placeholder="Enter volume"
+                                              className="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                              Date
+                                            </label>
+                                            <input
+                                              type="date"
+                                              value={testCase.vtDate || ''}
+                                              onChange={(e) => handleVtDateChange(testCase.testId, e.target.value)}
+                                              className="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                              Start Time
+                                            </label>
+                                            <input
+                                              type="time"
+                                              value={testCase.vtStartTime || ''}
+                                              onChange={(e) => handleVtStartTimeChange(testCase.testId, e.target.value)}
+                                              className="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                              End Time
+                                            </label>
+                                            <input
+                                              type="time"
+                                              value={testCase.vtEndTime || ''}
+                                              onChange={(e) => handleVtEndTimeChange(testCase.testId, e.target.value)}
+                                              className="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                              Availability (%)
+                                            </label>
+                                            <input
+                                              type="text"
+                                              value={testCase.vtAvailability || ''}
+                                              onChange={(e) => handleVtAvailabilityChange(testCase.testId, e.target.value)}
+                                              placeholder="Enter percentage"
+                                              className="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                              Status
+                                            </label>
+                                            <select
+                                              value={testCase.status}
+                                              onChange={(e) => handleStatusChange(testCase.testId, e.target.value)}
+                                              className={`w-full px-2 py-2 rounded text-sm font-medium border focus:ring-1 focus:ring-blue-500 ${
+                                                testCase.status === 'PASS' ? 'bg-green-100 text-green-800 border-green-300' :
+                                                testCase.status === 'FAIL' ? 'bg-red-100 text-red-800 border-red-300' :
+                                                testCase.status === 'BLOCKED' ? 'bg-orange-100 text-orange-800 border-orange-300' :
+                                                testCase.status === 'NA' ? 'bg-slate-100 text-slate-800 border-slate-300' :
+                                                'bg-gray-100 text-gray-800 border-gray-300'
+                                              }`}
+                                            >
+                                              <option value="NOT RUN">⏸️ NOT RUN</option>
+                                              <option value="PASS">✅ PASS</option>
+                                              <option value="FAIL">❌ FAIL</option>
+                                              <option value="BLOCKED">🚫 BLOCKED</option>
+                                              <option value="NA">N/A</option>
+                                            </select>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        // Regular test case - show status dropdown
+                                      <div>
+                                        <select
+                                          value={testCase.status}
+                                          onChange={(e) => handleStatusChange(testCase.testId, e.target.value)}
+                                          className={`w-full px-2 py-2 rounded text-sm font-medium border focus:ring-1 focus:ring-blue-500 ${
+                                            testCase.status === 'PASS' ? 'bg-green-100 text-green-800 border-green-300' :
+                                            testCase.status === 'FAIL' ? 'bg-red-100 text-red-800 border-red-300' :
+                                            testCase.status === 'BLOCKED' ? 'bg-orange-100 text-orange-800 border-orange-300' :
+                                            testCase.status === 'NA' ? 'bg-slate-100 text-slate-800 border-slate-300' :
+                                            'bg-gray-100 text-gray-800 border-gray-300'
+                                          }`}
+                                        >
+                                          <option value="NOT RUN">⏸️ NOT RUN</option>
+                                          <option value="PASS">✅ PASS</option>
+                                          <option value="FAIL">❌ FAIL</option>
+                                          <option value="BLOCKED">🚫 BLOCKED</option>
+                                          <option value="NA">N/A</option>
+                                        </select>
+                                      </div>
+                                      )}
+                                      <div>
+                                        <input
+                                          type="text"
+                                          value={testCaseNotes[testCase.testId] || ''}
+                                          onChange={(e) => handleNoteChange(testCase.testId, e.target.value)}
+                                          placeholder="Add notes..."
+                                          className="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                        />
+                                      </div>
+                                    </div>
+                                  ))}
                                 </div>
                               </div>
+                              
+                              {/* Desktop Table Layout */}
+                              <div className="hidden sm:block">
+                                <div className="overflow-x-auto">
+                                  <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-50">
+                                      <tr>
+                                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">
+                                          Test Case
+                                        </th>
+                                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
+                                          Test ID
+                                        </th>
+                                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">
+                                          {firstCellTestCases.some(tc => tc.testId && tc.testId.startsWith('CH-') && tc.scope === 'Hardening') ? 'Data' : 
+                                           firstCellTestCases.some(tc => tc.testId && tc.testId.startsWith('VT-')) ? 'VT Data' : 'Status'}
+                                        </th>
+                                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">
+                                          Notes
+                                        </th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                      {firstCellTestCases.map((testCase, index) => (
+                                        <tr key={testCase.testId} className="hover:bg-gray-50">
+                                          <td className="px-2 py-2 whitespace-nowrap">
+                                            <div className="flex items-center space-x-2">
+                                              <div className="flex-1 min-w-0">
+                                                <div className="text-sm font-medium text-gray-900">
+                                                  <div>{testCase.testCase}</div>
+                                                  <button
+                                                    onClick={() => openHelpModal(testCase)}
+                                                    className="text-blue-500 hover:text-blue-700 transition-colors text-xs underline mt-1 block"
+                                                    title="View test case details"
+                                                  >
+                                                    Help
+                                                  </button>
+                                                </div>
+                                                {/* Scope Badge */}
+                                                <div className="mt-1">
+                                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getScopeBadgeColor(testCase.scope)}`}>
+                                                    {testCase.scope}
+                                                  </span>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </td>
+                                          <td className="px-2 py-2 whitespace-nowrap">
+                                            <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs font-mono">
+                                              {testCase.testId}
+                                            </span>
+                                          </td>
+                                          <td className="px-2 py-2">
+                                            {testCase.testId && testCase.testId.startsWith('CH-') && testCase.scope === 'Hardening' ? (
+                                              // Hardening test case - show volume and date inputs with labels
+                                              <div className="space-y-3">
+                                                <div>
+                                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                    Volume
+                                                  </label>
+                                                  <input
+                                                    type="text"
+                                                    value={testCase.chVolume || ''}
+                                                    onChange={(e) => handleHardeningVolumeChange(testCase.testId, e.target.value)}
+                                                    placeholder="Enter volume"
+                                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                                  />
+                                                </div>
+                                                <div>
+                                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                    Date
+                                                  </label>
+                                                  <input
+                                                    type="date"
+                                                    value={testCase.chDate || ''}
+                                                    onChange={(e) => handleHardeningDateChange(testCase.testId, e.target.value)}
+                                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                                  />
+                                                </div>
+                                              </div>
+                                            ) : testCase.testId && testCase.testId.startsWith('VT-') ? (
+                                              // VT test case - show volume, date, start time, end time, availability inputs + status with labels
+                                              <div className="space-y-3">
+                                                <div>
+                                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                    Volume
+                                                  </label>
+                                                  <input
+                                                    type="text"
+                                                    value={testCase.vtVolume || ''}
+                                                    onChange={(e) => handleVtVolumeChange(testCase.testId, e.target.value)}
+                                                    placeholder="Enter volume"
+                                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                                  />
+                                                </div>
+                                                <div>
+                                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                    Date
+                                                  </label>
+                                                  <input
+                                                    type="date"
+                                                    value={testCase.vtDate || ''}
+                                                    onChange={(e) => handleVtDateChange(testCase.testId, e.target.value)}
+                                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                                  />
+                                                </div>
+                                                <div>
+                                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                    Start Time
+                                                  </label>
+                                                  <input
+                                                    type="time"
+                                                    value={testCase.vtStartTime || ''}
+                                                    onChange={(e) => handleVtStartTimeChange(testCase.testId, e.target.value)}
+                                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                                  />
+                                                </div>
+                                                <div>
+                                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                    End Time
+                                                  </label>
+                                                  <input
+                                                    type="time"
+                                                    value={testCase.vtEndTime || ''}
+                                                    onChange={(e) => handleVtEndTimeChange(testCase.testId, e.target.value)}
+                                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                                  />
+                                                </div>
+                                                <div>
+                                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                    Availability (%)
+                                                  </label>
+                                                  <input
+                                                    type="text"
+                                                    value={testCase.vtAvailability || ''}
+                                                    onChange={(e) => handleVtAvailabilityChange(testCase.testId, e.target.value)}
+                                                    placeholder="Enter percentage"
+                                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                                  />
+                                                </div>
+                                                <div>
+                                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                    Status
+                                                  </label>
+                                                  <select
+                                                    value={testCase.status}
+                                                    onChange={(e) => handleStatusChange(testCase.testId, e.target.value)}
+                                                    className={`w-full px-2 py-1 rounded text-sm font-medium border focus:ring-1 focus:ring-blue-500 ${
+                                                      testCase.status === 'PASS' ? 'bg-green-100 text-green-800 border-green-300' :
+                                                      testCase.status === 'FAIL' ? 'bg-red-100 text-red-800 border-red-300' :
+                                                      testCase.status === 'BLOCKED' ? 'bg-orange-100 text-orange-800 border-orange-300' :
+                                                      testCase.status === 'NA' ? 'bg-slate-100 text-slate-800 border-slate-300' :
+                                                      'bg-gray-100 text-gray-800 border-gray-300'
+                                                    }`}
+                                                  >
+                                                    <option value="NOT RUN">⏸️ NOT RUN</option>
+                                                    <option value="PASS">✅ PASS</option>
+                                                    <option value="FAIL">❌ FAIL</option>
+                                                    <option value="BLOCKED">🚫 BLOCKED</option>
+                                                    <option value="NA">N/A</option>
+                                                  </select>
+                                                </div>
+                                              </div>
+                                            ) : (
+                                              // Regular test case - show status dropdown
+                                            <select
+                                              value={testCase.status}
+                                              onChange={(e) => handleStatusChange(testCase.testId, e.target.value)}
+                                              className={`px-2 py-1 rounded text-sm font-medium border focus:ring-1 focus:ring-blue-500 ${
+                                                testCase.status === 'PASS' ? 'bg-green-100 text-green-800 border-green-300' :
+                                                testCase.status === 'FAIL' ? 'bg-red-100 text-red-800 border-red-300' :
+                                                testCase.status === 'BLOCKED' ? 'bg-orange-100 text-orange-800 border-orange-300' :
+                                                testCase.status === 'NA' ? 'bg-slate-100 text-slate-800 border-slate-300' :
+                                                'bg-gray-100 text-gray-800 border-gray-300'
+                                              }`}
+                                            >
+                                              <option value="NOT RUN">⏸️ NOT RUN</option>
+                                              <option value="PASS">✅ PASS</option>
+                                              <option value="FAIL">❌ FAIL</option>
+                                              <option value="BLOCKED">🚫 BLOCKED</option>
+                                              <option value="NA">N/A</option>
+                                            </select>
+                                            )}
+                                          </td>
+                                          <td className="px-2 py-2">
+                                            <input
+                                              type="text"
+                                              value={testCaseNotes[testCase.testId] || ''}
+                                              onChange={(e) => handleNoteChange(testCase.testId, e.target.value)}
+                                              placeholder="Add notes..."
+                                              className="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                            />
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            </div>
                             )}
                           </div>
                         );
@@ -991,25 +1804,97 @@ const Testing = ({ currentUser }) => {
                         {/* Cell Content - Test Cases */}
                         {expandedCell === `${cellTypeGroup.cellType}-${cellName}` && (
                           <div className="border-t border-gray-200 bg-white">
+                            {(() => {
+                              // Group test cases by scope
+                              const testCasesByScope = cellData.testCases.reduce((acc, testCase) => {
+                                const scope = testCase.scope || 'Unknown';
+                                if (!acc[scope]) {
+                                  acc[scope] = [];
+                                }
+                                acc[scope].push(testCase);
+                                return acc;
+                              }, {});
+
+                              return Object.entries(testCasesByScope)
+                                .sort(([scopeA], [scopeB]) => scopeA.localeCompare(scopeB)) // Sort scopes alphabetically
+                                .map(([scope, scopeTestCases]) => {
+                                const scopeKey = `${cellTypeGroup.cellType}-${cellName}-${scope}`;
+                                const isScopeExpanded = expandedScopes[scopeKey];
+                                
+                                // Calculate scope statistics
+                                const scopeStats = scopeTestCases.reduce((stats, testCase) => {
+                                  switch (testCase.status) {
+                                    case 'PASS': stats.passed++; break;
+                                    case 'FAIL': stats.failed++; break;
+                                    case 'BLOCKED': stats.blocked++; break;
+                                    case 'NA': stats.na++; break;
+                                    default: stats.notRun++; break;
+                                  }
+                                  return stats;
+                                }, { passed: 0, failed: 0, blocked: 0, notRun: 0, na: 0 });
+
+                                return (
+                                  <div key={scopeKey} className="border-b border-gray-100 last:border-b-0 ml-4 sm:ml-6">
+                                    {/* Scope Header */}
+                                    <button
+                                      onClick={() => toggleScope(cellTypeGroup.cellType, cellName, scope)}
+                                      className="w-full text-left bg-blue-50 hover:bg-blue-100 transition-colors p-2 sm:p-3 border-l-4 border-blue-400 pl-3 sm:pl-4 rounded-r-md shadow-sm"
+                                    >
+                                      <div className="flex items-center justify-between space-x-2 sm:space-x-4">
+                                        <div className="flex items-center space-x-2 sm:space-x-3 w-full sm:w-auto">
+                                          <div className="w-4 h-4 rounded-sm bg-blue-500 flex items-center justify-center flex-shrink-0">
+                                            <span className="text-white text-xs">📋</span>
+                                          </div>
+                                          <div className="text-left flex-1 min-w-0">
+                                            <h6 className="font-medium text-gray-800 text-sm leading-tight">
+                                              {scope}
+                                            </h6>
+                                            <p className="text-xs text-gray-500 leading-tight">
+                                              {scopeTestCases.length} test cases
+                                            </p>
+                                          </div>
+                                        </div>
+                                        
+                                        <div className="flex items-center justify-between sm:justify-end space-x-2 sm:space-x-4 w-full sm:w-auto">
+                                          {/* Scope Status Summary */}
+                                          <div className="flex items-center space-x-1 sm:space-x-3 text-xs sm:text-sm">
+                                            <span className="text-green-600 font-medium">{scopeStats.passed}✅</span>
+                                            <span className="text-red-600 font-medium">{scopeStats.failed}❌</span>
+                                            <span className="text-orange-600 font-medium">{scopeStats.blocked}🚫</span>
+                                            <span className="text-gray-600 font-medium">{scopeStats.notRun}⏸️</span>
+                                            <span className="text-slate-600 font-medium">{scopeStats.na}N/A</span>
+                                          </div>
+                                          
+                                          {/* Expand/Collapse Indicator */}
+                                          <div className="w-4 h-4 bg-blue-600 rounded-sm flex items-center justify-center flex-shrink-0">
+                              <span className="text-white text-xs transform transition-transform duration-200">
+                                              {isScopeExpanded ? '−' : '+'}
+                              </span>
+                                          </div>
+                            </div>
+                          </div>
+                        </button>
+
+                                    {/* Scope Content - Test Cases */}
+                                    {isScopeExpanded && (
+                                      <div className="border-t border-blue-200 bg-gradient-to-r from-blue-50 to-white ml-4 sm:ml-6 mr-2 rounded-b-md">
                     {/* Mobile: Card Layout, Desktop: Table Layout */}
                     <div className="block sm:hidden">
                       {/* Mobile Card Layout */}
-                      <div className="divide-y divide-gray-200">
-                                {cellData.testCases.map((testCase, index) => (
-                          <div key={testCase.testId} className="p-3 space-y-3">
+                                          <div className="divide-y divide-gray-200 p-2">
+                                            {scopeTestCases.map((testCase, index) => (
+                          <div key={testCase.testId} className="p-3 space-y-3 bg-white rounded border border-gray-100 shadow-sm mx-2 my-2">
                                                         {/* Test Case Header */}
                             <div className="flex items-start justify-between">
                               <div className="flex-1 min-w-0">
-                                <div className="font-medium text-gray-900 text-sm flex items-center space-x-2">
-                                  <span className="truncate">{testCase.testCase}</span>
+                                <div className="font-medium text-gray-900 text-sm">
+                                  <div className="truncate">{testCase.testCase}</div>
                                   <button
                                     onClick={() => openHelpModal(testCase)}
-                                    className="text-blue-500 hover:text-blue-700 transition-colors flex-shrink-0"
+                                    className="text-blue-500 hover:text-blue-700 transition-colors text-xs underline mt-1"
                                     title="View test case details"
                                   >
-                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3 001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-                                    </svg>
+                                    Help
                                   </button>
                                 </div>
                                 {/* Scope Badge */}
@@ -1028,7 +1913,119 @@ const Testing = ({ currentUser }) => {
                               </span>
                             </div>
                             
-                            {/* Status */}
+                            {/* Status, Hardening, or VT Inputs */}
+                            {testCase.testId && testCase.testId.startsWith('CH-') && testCase.scope === 'Hardening' ? (
+                              // Hardening test case - show volume and date inputs
+                              <div className="space-y-3">
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                    Volume
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={testCase.chVolume || ''}
+                                    onChange={(e) => handleHardeningVolumeChange(testCase.testId, e.target.value)}
+                                    placeholder="Enter volume"
+                                    className="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                    Date
+                                  </label>
+                                  <input
+                                    type="date"
+                                    value={testCase.chDate || ''}
+                                    onChange={(e) => handleHardeningDateChange(testCase.testId, e.target.value)}
+                                    className="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                  />
+                                </div>
+                              </div>
+                            ) : testCase.testId && testCase.testId.startsWith('VT-') ? (
+                              // VT test case - show volume, date, start time, end time, availability inputs + status in two columns
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                    Volume
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={testCase.vtVolume || ''}
+                                    onChange={(e) => handleVtVolumeChange(testCase.testId, e.target.value)}
+                                    placeholder="Enter volume"
+                                    className="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                    Date
+                                  </label>
+                                  <input
+                                    type="date"
+                                    value={testCase.vtDate || ''}
+                                    onChange={(e) => handleVtDateChange(testCase.testId, e.target.value)}
+                                    className="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                    Start Time
+                                  </label>
+                                  <input
+                                    type="time"
+                                    value={testCase.vtStartTime || ''}
+                                    onChange={(e) => handleVtStartTimeChange(testCase.testId, e.target.value)}
+                                    className="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                    End Time
+                                  </label>
+                                  <input
+                                    type="time"
+                                    value={testCase.vtEndTime || ''}
+                                    onChange={(e) => handleVtEndTimeChange(testCase.testId, e.target.value)}
+                                    className="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                    Availability (%)
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={testCase.vtAvailability || ''}
+                                    onChange={(e) => handleVtAvailabilityChange(testCase.testId, e.target.value)}
+                                    placeholder="Enter percentage"
+                                    className="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                    Status
+                                  </label>
+                                  <select
+                                    value={testCase.status}
+                                    onChange={(e) => handleStatusChange(testCase.testId, e.target.value)}
+                                    className={`w-full px-2 py-2 rounded text-sm font-medium border focus:ring-1 focus:ring-blue-500 ${
+                                      testCase.status === 'PASS' ? 'bg-green-100 text-green-800 border-green-300' :
+                                      testCase.status === 'FAIL' ? 'bg-red-100 text-red-800 border-red-300' :
+                                      testCase.status === 'BLOCKED' ? 'bg-orange-100 text-orange-800 border-orange-300' :
+                                      testCase.status === 'NA' ? 'bg-slate-100 text-slate-800 border-slate-300' :
+                                      'bg-gray-100 text-gray-800 border-gray-300'
+                                    }`}
+                                  >
+                                    <option value="NOT RUN">⏸️ NOT RUN</option>
+                                    <option value="PASS">✅ PASS</option>
+                                    <option value="FAIL">❌ FAIL</option>
+                                    <option value="BLOCKED">🚫 BLOCKED</option>
+                                    <option value="NA">N/A</option>
+                                  </select>
+                                </div>
+                              </div>
+                            ) : (
+                              // Regular test case - show status dropdown
                             <div>
                               <select
                                 value={testCase.status}
@@ -1048,6 +2045,7 @@ const Testing = ({ currentUser }) => {
                                 <option value="NA">N/A</option>
                               </select>
                             </div>
+                            )}
                             
                             {/* Notes */}
                             <div>
@@ -1067,75 +2065,181 @@ const Testing = ({ currentUser }) => {
                             {/* Desktop Table Layout */}
                             <div className="hidden sm:block">
                               <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-gray-200">
-                                  <thead className="bg-gray-50">
-                                    <tr>
-                                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">
-                                        Test Case
-                                      </th>
-                                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                                                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">
+                              Test Case
+                            </th>
+                                                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
                                         Test ID
-                                      </th>
-                                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
-                                        Status
-                                      </th>
-                                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">
-                                        Details
-                                      </th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="bg-white divide-y divide-gray-200">
-                                    {cellData.testCases.map((testCase, index) => (
+                            </th>
+                                                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">
+                              {scopeTestCases.some(tc => tc.testId && tc.testId.startsWith('CH-') && tc.scope === 'Hardening') ? 'Data' : 
+                               scopeTestCases.some(tc => tc.testId && tc.testId.startsWith('VT-')) ? 'VT Data' : 'Status'}
+                            </th>
+                                                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">
+                                        Notes
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                                                {scopeTestCases.map((testCase, index) => (
                                       <tr key={testCase.testId} className="hover:bg-gray-50">
-                                        <td className="px-3 py-4 whitespace-nowrap">
+                                        <td className="px-2 py-2 whitespace-nowrap">
                                           <div className="flex items-center space-x-2">
                                             <div className="flex-1 min-w-0">
                                               <div className="text-sm font-medium text-gray-900">
-                                                {testCase.testCase}
-                                              </div>
-                                              {/* Scope Badge */}
-                                              <div className="mt-1">
-                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getScopeBadgeColor(testCase.scope)}`}>
-                                                  {testCase.scope}
-                                                </span>
-                                              </div>
-                                            </div>
+                                                <div>{testCase.testCase}</div>
                                             <button
                                               onClick={() => openHelpModal(testCase)}
-                                              className="text-blue-500 hover:text-blue-700 transition-colors flex-shrink-0"
+                                                  className="text-blue-500 hover:text-blue-700 transition-colors text-xs underline mt-1 block"
                                               title="View test case details"
                                             >
-                                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3 001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-                                              </svg>
+                                                  Help
                                             </button>
+                                              </div>
+                                            </div>
                                           </div>
                                         </td>
-                                        <td className="px-3 py-4 whitespace-nowrap">
+                                        <td className="px-2 py-2 whitespace-nowrap">
                                           <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs font-mono">
-                                            {testCase.testId}
-                                          </span>
-                                        </td>
-                                        <td className="px-3 py-4 whitespace-nowrap">
-                                          <select
-                                            value={testCase.status}
-                                            onChange={(e) => handleStatusChange(testCase.testId, e.target.value)}
+                                  {testCase.testId}
+                                </span>
+                              </td>
+                                        <td className="px-2 py-2">
+                                          {testCase.testId && testCase.testId.startsWith('CH-') && testCase.scope === 'Hardening' ? (
+                                            // Hardening test case - show volume and date inputs with labels
+                                            <div className="space-y-3">
+                                              <div>
+                                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                  Volume
+                                                </label>
+                                                <input
+                                                  type="text"
+                                                  value={testCase.chVolume || ''}
+                                                  onChange={(e) => handleHardeningVolumeChange(testCase.testId, e.target.value)}
+                                                  placeholder="Enter volume"
+                                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                  Date
+                                                </label>
+                                                <input
+                                                  type="date"
+                                                  value={testCase.chDate || ''}
+                                                  onChange={(e) => handleHardeningDateChange(testCase.testId, e.target.value)}
+                                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                                />
+                                              </div>
+                                            </div>
+                                          ) : testCase.testId && testCase.testId.startsWith('VT-') ? (
+                                            // VT test case - show volume, date, start time, end time, availability inputs + status with labels in two columns
+                                            <div className="grid grid-cols-2 gap-3">
+                                              <div>
+                                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                  Volume
+                                                </label>
+                                                <input
+                                                  type="text"
+                                                  value={testCase.vtVolume || ''}
+                                                  onChange={(e) => handleVtVolumeChange(testCase.testId, e.target.value)}
+                                                  placeholder="Enter volume"
+                                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                  Date
+                                                </label>
+                                                <input
+                                                  type="date"
+                                                  value={testCase.vtDate || ''}
+                                                  onChange={(e) => handleVtDateChange(testCase.testId, e.target.value)}
+                                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                  Start Time
+                                                </label>
+                                                <input
+                                                  type="time"
+                                                  value={testCase.vtStartTime || ''}
+                                                  onChange={(e) => handleVtStartTimeChange(testCase.testId, e.target.value)}
+                                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                  End Time
+                                                </label>
+                                                <input
+                                                  type="time"
+                                                  value={testCase.vtEndTime || ''}
+                                                  onChange={(e) => handleVtEndTimeChange(testCase.testId, e.target.value)}
+                                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                  Availability (%)
+                                                </label>
+                                                <input
+                                                  type="text"
+                                                  value={testCase.vtAvailability || ''}
+                                                  onChange={(e) => handleVtAvailabilityChange(testCase.testId, e.target.value)}
+                                                  placeholder="Enter percentage"
+                                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                  Status
+                                                </label>
+                                                <select
+                                                  value={testCase.status}
+                                                  onChange={(e) => handleStatusChange(testCase.testId, e.target.value)}
+                                                  className={`w-full px-2 py-1 rounded text-sm font-medium border focus:ring-1 focus:ring-blue-500 ${
+                                                    testCase.status === 'PASS' ? 'bg-green-100 text-green-800 border-green-300' :
+                                                    testCase.status === 'FAIL' ? 'bg-red-100 text-red-800 border-red-300' :
+                                                    testCase.status === 'BLOCKED' ? 'bg-orange-100 text-orange-800 border-orange-300' :
+                                                    testCase.status === 'NA' ? 'bg-slate-100 text-slate-800 border-slate-300' :
+                                                    'bg-gray-100 text-gray-800 border-gray-300'
+                                                  }`}
+                                                >
+                                                  <option value="NOT RUN">⏸️ NOT RUN</option>
+                                                  <option value="PASS">✅ PASS</option>
+                                                  <option value="FAIL">❌ FAIL</option>
+                                                  <option value="BLOCKED">🚫 BLOCKED</option>
+                                                  <option value="NA">N/A</option>
+                                                </select>
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            // Regular test case - show status dropdown
+                                <select
+                                  value={testCase.status}
+                                  onChange={(e) => handleStatusChange(testCase.testId, e.target.value)}
                                             className={`px-2 py-1 rounded text-sm font-medium border focus:ring-1 focus:ring-blue-500 ${
-                                              testCase.status === 'PASS' ? 'bg-green-100 text-green-800 border-green-300' :
-                                              testCase.status === 'FAIL' ? 'bg-red-100 text-red-800 border-red-300' :
-                                              testCase.status === 'BLOCKED' ? 'bg-orange-100 text-orange-800 border-orange-300' :
-                                              testCase.status === 'NA' ? 'bg-slate-100 text-slate-800 border-slate-300' :
-                                              'bg-gray-100 text-gray-800 border-gray-300'
-                                            }`}
-                                          >
-                                            <option value="NOT RUN">⏸️ NOT RUN</option>
-                                            <option value="PASS">✅ PASS</option>
-                                            <option value="FAIL">❌ FAIL</option>
-                                            <option value="BLOCKED">🚫 BLOCKED</option>
-                                            <option value="NA">N/A</option>
-                                          </select>
-                                        </td>
-                                        <td className="px-3 py-4 whitespace-nowrap">
+                                    testCase.status === 'PASS' ? 'bg-green-100 text-green-800 border-green-300' :
+                                    testCase.status === 'FAIL' ? 'bg-red-100 text-red-800 border-red-300' :
+                                    testCase.status === 'BLOCKED' ? 'bg-orange-100 text-orange-800 border-orange-300' :
+                                    testCase.status === 'NA' ? 'bg-slate-100 text-slate-800 border-slate-300' :
+                                    'bg-gray-100 text-gray-800 border-gray-300'
+                                  }`}
+                                >
+                                  <option value="NOT RUN">⏸️ NOT RUN</option>
+                                  <option value="PASS">✅ PASS</option>
+                                  <option value="FAIL">❌ FAIL</option>
+                                  <option value="BLOCKED">🚫 BLOCKED</option>
+                                  <option value="NA">N/A</option>
+                                </select>
+                                          )}
+                              </td>
+                                                    <td className="px-2 py-2">
                                           <input
                                             type="text"
                                             value={testCaseNotes[testCase.testId] || ''}
@@ -1143,13 +2247,19 @@ const Testing = ({ currentUser }) => {
                                             placeholder="Add notes..."
                                             className="w-full px-2 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                                           />
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              });
+                            })()}
                               </div>
                         )}
                       </div>
@@ -1182,25 +2292,36 @@ const Testing = ({ currentUser }) => {
                 <h3 className="text-lg font-medium text-gray-900 mb-4">Test Case Details</h3>
                 <div className="space-y-3">
                 <div>
-                    <label className="block text-sm font-medium text-gray-700">Test Case:</label>
-                    <p className="text-sm text-gray-900">{selectedTestCase.testCase}</p>
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Test ID:</label>
-                    <p className="text-sm text-gray-900 font-mono">{selectedTestCase.testId}</p>
-                </div>
-                <div>
                     <label className="block text-sm font-medium text-gray-700">Description:</label>
                     <p className="text-sm text-gray-900">{selectedTestCase.description || 'No description available'}</p>
                 </div>
                 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700">Cell Type:</label>
-                    <p className="text-sm text-gray-900">{selectedTestCase.cellType || 'Not specified'}</p>
+                    <label className="block text-sm font-medium text-gray-700">Requirements:</label>
+                    <p className="text-sm text-gray-900">{selectedTestCase.requirements || 'No requirements available'}</p>
                 </div>
+                
                 <div>
-                    <label className="block text-sm font-medium text-gray-700">Cell:</label>
-                    <p className="text-sm text-gray-900">{selectedTestCase.cell || 'Not specified'}</p>
+                    <label className="block text-sm font-medium text-gray-700">Steps:</label>
+                    <p className="text-sm text-gray-900">{selectedTestCase.steps || 'No steps available'}</p>
+                </div>
+                
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">Image:</label>
+                    {selectedTestCase.image ? (
+                      <img 
+                        src={selectedTestCase.image} 
+                        alt="Test case image" 
+                        className="mt-2 max-w-full h-auto rounded border"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'block';
+                        }}
+                      />
+                    ) : null}
+                    <p className="text-sm text-gray-500" style={{display: selectedTestCase.image ? 'none' : 'block'}}>
+                      No image available
+                    </p>
                 </div>
                   </div>
                 <div className="mt-6 flex justify-end">

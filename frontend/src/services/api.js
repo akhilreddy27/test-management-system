@@ -29,7 +29,16 @@ export const testCasesAPI = {
 export const testStatusAPI = {
   getAll: () => api.get('/test-status'),
   update: (statusData) => api.put('/test-status', statusData),
-  updateStatus: (testId, status) => api.put('/test-status/status', { testId, status }),
+  updateStatus: (testId, statusOrFields) => {
+    // If statusOrFields is a simple string (like 'PASS', 'FAIL'), wrap it in status
+    // If it's an object with hardening fields (like { chVolume: '123' }), merge directly
+    if (typeof statusOrFields === 'string') {
+      return api.put('/test-status/status', { testId, status: statusOrFields });
+    } else {
+      // For hardening/rate fields, merge directly into the request body
+      return api.put('/test-status/status', { testId, ...statusOrFields });
+    }
+  },
   updateNote: (testId, note) => api.put('/test-status/note', { testId, note }),
   getByTestId: (testId) => api.get(`/test-status/test/${testId}`),
   submitResults: (resultsData) => api.post('/test-status/submit', resultsData),

@@ -209,7 +209,7 @@ class ExcelService {
         scope: row['Scope'],
         phase: row['Phase'],
         steps: row['Steps'] || '',
-        expectedOutput: row['Description'] || '', // Changed from 'Expected Output' to 'Description'
+        description: row['Description'] || '',
         multiDriveway: row['Multi Driveway'] === 'true' || row['Multi Driveway'] === true || row['Multi Driveway'] === 'TRUE' || row['Multi Driveway'] === 1,
         drivewayType: row['Driveway Type'] || 'N/A',
         combinedTest: row['Combined Test'] === 'true' || row['Combined Test'] === true || row['Combined Test'] === 'TRUE' || row['Combined Test'] === 1,

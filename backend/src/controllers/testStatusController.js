@@ -65,7 +65,14 @@ class TestStatusController {
     console.log('Request body:', JSON.stringify(req.body, null, 2));
     
     try {
-      const { testId, cell, cellType, site, status, lastModified, modifiedUser, day, date, productionNumber, notes, volume, startTime, endTime, availability, vtVolume, vtDate, vtStartTime, vtEndTime, driveway1Status, driveway2Status } = req.body;
+      const { testId, cell, cellType, site, status, lastModified, modifiedUser, day, date, productionNumber, notes, volume, startTime, endTime, availability, vtVolume, vtDate, vtStartTime, vtEndTime, vtAvailability, driveway1Status, driveway2Status, chVolume, chDate } = req.body;
+      
+      // Debug logging for VT availability
+      if (vtAvailability !== undefined) {
+        console.log('=== VT AVAILABILITY UPDATE REQUEST ===');
+        console.log('Request body:', req.body);
+        console.log('vtAvailability value:', vtAvailability);
+      }
       
       if (!testId) {
         return res.status(400).json({
@@ -145,37 +152,70 @@ class TestStatusController {
             updatedEntry.chDate = date;
           }
           
+          // Handle direct hardening field updates from frontend
+          if (chVolume !== undefined) {
+            updatedEntry.chVolume = chVolume;
+            console.log(`CH Volume: ${entry.chVolume || ''} → ${chVolume}`);
+          }
+          if (chDate !== undefined) {
+            updatedEntry.chDate = chDate;
+            console.log(`CH Date: ${entry.chDate || ''} → ${chDate}`);
+          }
+          
           // Clear CH data if status is NOT RUN
           if (status === 'NOT RUN') {
             updatedEntry.chVolume = '';
             updatedEntry.chDate = '';
+            // Note: VT data should NOT be cleared when status is NOT RUN
+            console.log('Status set to NOT RUN - clearing CH data but preserving VT data');
           }
           
           // Update Volume Test data if provided
           if (volume !== undefined) {
             updatedEntry.vtVolume = volume;
+            console.log(`VT Volume (volume): ${entry.vtVolume || ''} → ${volume}`);
           }
           if (vtVolume !== undefined) {
             updatedEntry.vtVolume = vtVolume;
+            console.log(`VT Volume (vtVolume): ${entry.vtVolume || ''} → ${vtVolume}`);
           }
           if (vtDate !== undefined) {
             updatedEntry.vtDate = vtDate;
+            console.log(`VT Date: ${entry.vtDate || ''} → ${vtDate}`);
           }
           if (startTime !== undefined) {
             updatedEntry.vtStartTime = startTime;
+            console.log(`VT Start Time (startTime): ${entry.vtStartTime || ''} → ${startTime}`);
           }
           if (vtStartTime !== undefined) {
             updatedEntry.vtStartTime = vtStartTime;
+            console.log(`VT Start Time (vtStartTime): ${entry.vtStartTime || ''} → ${vtStartTime}`);
           }
           if (endTime !== undefined) {
             updatedEntry.vtEndTime = endTime;
+            console.log(`VT End Time (endTime): ${entry.vtEndTime || ''} → ${endTime}`);
           }
           if (vtEndTime !== undefined) {
             updatedEntry.vtEndTime = vtEndTime;
+            console.log(`VT End Time (vtEndTime): ${entry.vtEndTime || ''} → ${vtEndTime}`);
           }
           if (availability !== undefined) {
             updatedEntry.vtAvailability = availability;
+            console.log(`VT Availability (availability): ${entry.vtAvailability || ''} → ${availability}`);
           }
+          if (vtAvailability !== undefined) {
+            updatedEntry.vtAvailability = vtAvailability;
+            console.log(`VT Availability (vtAvailability): ${entry.vtAvailability || ''} → ${vtAvailability}`);
+          }
+          
+          // Debug: Log final VT values before saving
+          console.log('Final VT values before save:', {
+            vtVolume: updatedEntry.vtVolume,
+            vtDate: updatedEntry.vtDate,
+            vtStartTime: updatedEntry.vtStartTime,
+            vtEndTime: updatedEntry.vtEndTime,
+            vtAvailability: updatedEntry.vtAvailability
+          });
           
           return updatedEntry;
         }
@@ -204,11 +244,11 @@ class TestStatusController {
         if (driveway2Status !== undefined) {
           logMessage += `, Driveway 2: ${oldDriveway2Status || 'NOT RUN'} → ${driveway2Status}`;
         }
-        if (productionNumber || volume) {
-          logMessage += `, Volume: ${oldVolume} → ${productionNumber || volume || oldVolume}`;
+        if (productionNumber || volume || chVolume || vtVolume) {
+          logMessage += `, Volume: ${oldVolume} → ${productionNumber || volume || chVolume || vtVolume || oldVolume}`;
         }
-        if (date || vtDate) {
-          logMessage += `, Date: ${oldDate} → ${date || vtDate || oldDate}`;
+        if (date || vtDate || chDate) {
+          logMessage += `, Date: ${oldDate} → ${date || vtDate || chDate || oldDate}`;
         }
         
         LoggingMiddleware.logAction(
