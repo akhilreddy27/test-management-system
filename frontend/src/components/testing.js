@@ -880,37 +880,13 @@ const Testing = ({ currentUser }) => {
         cellType,
         cells: {},
         firstCellTestCases: [], // Test cases that should only be tested once per cell type
-        totalTestCases: 0,
-        passedCount: 0,
-        failedCount: 0,
-        blockedCount: 0,
-        notRunCount: 0,
-        naCount: 0
+        totalTestCases: 0
       };
     }
     
     // Handle test cases that should be tested only once per cell type (cells: "First")
     if (cells === "First") {
       cellTypeGroups[cellType].firstCellTestCases.push(testCase);
-      
-      // Update cell type level counts for "First" test cases
-      switch (testCase.status) {
-        case 'PASS':
-          cellTypeGroups[cellType].passedCount++;
-          break;
-        case 'FAIL':
-          cellTypeGroups[cellType].failedCount++;
-          break;
-        case 'BLOCKED':
-          cellTypeGroups[cellType].blockedCount++;
-          break;
-        case 'NA':
-          cellTypeGroups[cellType].naCount++;
-          break;
-        default:
-          cellTypeGroups[cellType].notRunCount++;
-          break;
-      }
       
       cellTypeGroups[cellType].totalTestCases++;
       return cellTypeGroups;
@@ -921,41 +897,12 @@ const Testing = ({ currentUser }) => {
     if (!cellTypeGroups[cellType].cells[cellName]) {
       cellTypeGroups[cellType].cells[cellName] = {
         cellName,
-        testCases: [],
-        passedCount: 0,
-        failedCount: 0,
-        blockedCount: 0,
-        notRunCount: 0,
-        naCount: 0
+        testCases: []
       };
     }
     
     // Add test case to the appropriate cell (only for "All" or other non-"First" values)
     cellTypeGroups[cellType].cells[cellName].testCases.push(testCase);
-    
-    // Update cell-level counts
-    switch (testCase.status) {
-      case 'PASS':
-        cellTypeGroups[cellType].cells[cellName].passedCount++;
-        cellTypeGroups[cellType].passedCount++;
-        break;
-      case 'FAIL':
-        cellTypeGroups[cellType].cells[cellName].failedCount++;
-        cellTypeGroups[cellType].failedCount++;
-        break;
-      case 'BLOCKED':
-        cellTypeGroups[cellType].cells[cellName].blockedCount++;
-        cellTypeGroups[cellType].blockedCount++;
-        break;
-      case 'NA':
-        cellTypeGroups[cellType].cells[cellName].naCount++;
-        cellTypeGroups[cellType].naCount++;
-        break;
-      default:
-        cellTypeGroups[cellType].cells[cellName].notRunCount++;
-        cellTypeGroups[cellType].notRunCount++;
-        break;
-    }
     
     cellTypeGroups[cellType].totalTestCases++;
     
@@ -1295,15 +1242,12 @@ const Testing = ({ currentUser }) => {
                   </div>
                   
                   <div className="flex items-center justify-between sm:justify-end space-x-2 sm:space-x-4 w-full sm:w-auto">
-                    {/* Status Summary */}
-                    <div className="flex items-center space-x-1 sm:space-x-3 text-xs sm:text-sm">
-                      <span className="text-green-600 font-medium">{cellTypeGroup.passedCount}✅</span>
-                      <span className="text-red-600 font-medium">{cellTypeGroup.failedCount}❌</span>
-                      <span className="text-orange-600 font-medium">{cellTypeGroup.blockedCount}🚫</span>
-                      <span className="text-gray-600 font-medium">{cellTypeGroup.notRunCount}⏸️</span>
-                      <span className="text-slate-600 font-medium">{cellTypeGroup.naCount}N/A</span>
+                    {/* Expand/Collapse Indicator */}
+                    <div className="w-6 h-6 bg-blue-600 rounded-md flex items-center justify-center flex-shrink-0">
+                      <span className="text-white text-sm transform transition-transform duration-200">
+                        {expandedCellType === cellTypeGroup.cellType ? '−' : '+'}
+                      </span>
                     </div>
-                    
                   </div>
                 </button>
 
@@ -1339,33 +1283,12 @@ const Testing = ({ currentUser }) => {
                               </div>
                                 
                                 <div className="flex items-center justify-between sm:justify-end space-x-2 sm:space-x-4 w-full sm:w-auto">
-                                  {/* Status Summary for First Cell Test Cases */}
-                                  <div className="flex items-center space-x-1 sm:space-x-3 text-xs sm:text-sm">
-                                    {(() => {
-                                      const statusCounts = firstCellTestCases.reduce((counts, testCase) => {
-                                        switch (testCase.status) {
-                                          case 'PASS': counts.passed++; break;
-                                          case 'FAIL': counts.failed++; break;
-                                          case 'BLOCKED': counts.blocked++; break;
-                                          case 'NA': counts.na++; break;
-                                          default: counts.notRun++; break;
-                                        }
-                                        return counts;
-                                      }, { passed: 0, failed: 0, blocked: 0, notRun: 0, na: 0 });
-                                      
-                                      return (
-                                        <>
-                                          <span className="text-green-600 font-medium">{statusCounts.passed}✅</span>
-                                          <span className="text-red-600 font-medium">{statusCounts.failed}❌</span>
-                                          <span className="text-orange-600 font-medium">{statusCounts.blocked}🚫</span>
-                                          <span className="text-gray-600 font-medium">{statusCounts.notRun}⏸️</span>
-                                          <span className="text-slate-600 font-medium">{statusCounts.na}N/A</span>
-                                        </>
-                                      );
-                                    })()}
+                                  {/* Expand/Collapse Indicator */}
+                                  <div className="w-5 h-5 bg-blue-600 rounded-sm flex items-center justify-center flex-shrink-0">
+                                    <span className="text-white text-xs transform transition-transform duration-200">
+                                      {isExpanded ? '−' : '+'}
+                                    </span>
                             </div>
-                            
-
                                 </div>
                               </div>
                             </button>
@@ -1419,7 +1342,7 @@ const Testing = ({ currentUser }) => {
                                       {testCase.testId && testCase.testId.startsWith('CH-') && testCase.scope === 'Hardening' ? (
                                         // Hardening test case - show volume and date inputs
                                         <div className="space-y-3">
-                                          <div>
+                                      <div>
                                             <label className="block text-xs font-medium text-gray-700 mb-1">
                                               Volume
                                             </label>
@@ -1507,24 +1430,24 @@ const Testing = ({ currentUser }) => {
                                             <label className="block text-xs font-medium text-gray-700 mb-1">
                                               Status
                                             </label>
-                                            <select
-                                              value={testCase.status}
-                                              onChange={(e) => handleStatusChange(testCase.testId, e.target.value)}
-                                              className={`w-full px-2 py-2 rounded text-sm font-medium border focus:ring-1 focus:ring-blue-500 ${
-                                                testCase.status === 'PASS' ? 'bg-green-100 text-green-800 border-green-300' :
-                                                testCase.status === 'FAIL' ? 'bg-red-100 text-red-800 border-red-300' :
-                                                testCase.status === 'BLOCKED' ? 'bg-orange-100 text-orange-800 border-orange-300' :
-                                                testCase.status === 'NA' ? 'bg-slate-100 text-slate-800 border-slate-300' :
-                                                'bg-gray-100 text-gray-800 border-gray-300'
-                                              }`}
-                                            >
-                                              <option value="NOT RUN">⏸️ NOT RUN</option>
-                                              <option value="PASS">✅ PASS</option>
-                                              <option value="FAIL">❌ FAIL</option>
-                                              <option value="BLOCKED">🚫 BLOCKED</option>
-                                              <option value="NA">N/A</option>
-                                            </select>
-                                          </div>
+                                        <select
+                                          value={testCase.status}
+                                          onChange={(e) => handleStatusChange(testCase.testId, e.target.value)}
+                                          className={`w-full px-2 py-2 rounded text-sm font-medium border focus:ring-1 focus:ring-blue-500 ${
+                                            testCase.status === 'PASS' ? 'bg-green-100 text-green-800 border-green-300' :
+                                            testCase.status === 'FAIL' ? 'bg-red-100 text-red-800 border-red-300' :
+                                            testCase.status === 'BLOCKED' ? 'bg-orange-100 text-orange-800 border-orange-300' :
+                                            testCase.status === 'NA' ? 'bg-slate-100 text-slate-800 border-slate-300' :
+                                            'bg-gray-100 text-gray-800 border-gray-300'
+                                          }`}
+                                        >
+                                          <option value="NOT RUN">⏸️ NOT RUN</option>
+                                          <option value="PASS">✅ PASS</option>
+                                          <option value="FAIL">❌ FAIL</option>
+                                          <option value="BLOCKED">🚫 BLOCKED</option>
+                                          <option value="NA">N/A</option>
+                                        </select>
+                                      </div>
                                         </div>
                                       ) : (
                                         // Regular test case - show status dropdown
@@ -1788,16 +1711,12 @@ const Testing = ({ currentUser }) => {
                           </div>
                           
                           <div className="flex items-center justify-between sm:justify-end space-x-2 sm:space-x-4 w-full sm:w-auto">
-                            {/* Cell Status Summary */}
-                            <div className="flex items-center space-x-1 sm:space-x-3 text-xs sm:text-sm">
-                              <span className="text-green-600 font-medium">{cellData.passedCount}✅</span>
-                              <span className="text-red-600 font-medium">{cellData.failedCount}❌</span>
-                              <span className="text-orange-600 font-medium">{cellData.blockedCount}🚫</span>
-                              <span className="text-gray-600 font-medium">{cellData.notRunCount}⏸️</span>
-                              <span className="text-slate-600 font-medium">{cellData.naCount}N/A</span>
+                            {/* Expand/Collapse Indicator */}
+                            <div className="w-5 h-5 bg-blue-600 rounded-sm flex items-center justify-center flex-shrink-0">
+                              <span className="text-white text-xs transform transition-transform duration-200">
+                                {expandedCell === `${cellTypeGroup.cellType}-${cellName}` ? '−' : '+'}
+                              </span>
                             </div>
-                            
-
                           </div>
                         </button>
 
@@ -1820,18 +1739,6 @@ const Testing = ({ currentUser }) => {
                                 .map(([scope, scopeTestCases]) => {
                                 const scopeKey = `${cellTypeGroup.cellType}-${cellName}-${scope}`;
                                 const isScopeExpanded = expandedScopes[scopeKey];
-                                
-                                // Calculate scope statistics
-                                const scopeStats = scopeTestCases.reduce((stats, testCase) => {
-                                  switch (testCase.status) {
-                                    case 'PASS': stats.passed++; break;
-                                    case 'FAIL': stats.failed++; break;
-                                    case 'BLOCKED': stats.blocked++; break;
-                                    case 'NA': stats.na++; break;
-                                    default: stats.notRun++; break;
-                                  }
-                                  return stats;
-                                }, { passed: 0, failed: 0, blocked: 0, notRun: 0, na: 0 });
 
                                 return (
                                   <div key={scopeKey} className="border-b border-gray-100 last:border-b-0 ml-4 sm:ml-6">
@@ -1856,22 +1763,13 @@ const Testing = ({ currentUser }) => {
                                         </div>
                                         
                                         <div className="flex items-center justify-between sm:justify-end space-x-2 sm:space-x-4 w-full sm:w-auto">
-                                          {/* Scope Status Summary */}
-                                          <div className="flex items-center space-x-1 sm:space-x-3 text-xs sm:text-sm">
-                                            <span className="text-green-600 font-medium">{scopeStats.passed}✅</span>
-                                            <span className="text-red-600 font-medium">{scopeStats.failed}❌</span>
-                                            <span className="text-orange-600 font-medium">{scopeStats.blocked}🚫</span>
-                                            <span className="text-gray-600 font-medium">{scopeStats.notRun}⏸️</span>
-                                            <span className="text-slate-600 font-medium">{scopeStats.na}N/A</span>
-                                          </div>
-                                          
                                           {/* Expand/Collapse Indicator */}
                                           <div className="w-4 h-4 bg-blue-600 rounded-sm flex items-center justify-center flex-shrink-0">
-                              <span className="text-white text-xs transform transition-transform duration-200">
+                                            <span className="text-white text-xs transform transition-transform duration-200">
                                               {isScopeExpanded ? '−' : '+'}
-                              </span>
+                                            </span>
                                           </div>
-                            </div>
+                                        </div>
                           </div>
                         </button>
 
@@ -1917,7 +1815,7 @@ const Testing = ({ currentUser }) => {
                             {testCase.testId && testCase.testId.startsWith('CH-') && testCase.scope === 'Hardening' ? (
                               // Hardening test case - show volume and date inputs
                               <div className="space-y-3">
-                                <div>
+                            <div>
                                   <label className="block text-xs font-medium text-gray-700 mb-1">
                                     Volume
                                   </label>
@@ -2005,24 +1903,24 @@ const Testing = ({ currentUser }) => {
                                   <label className="block text-xs font-medium text-gray-700 mb-1">
                                     Status
                                   </label>
-                                  <select
-                                    value={testCase.status}
-                                    onChange={(e) => handleStatusChange(testCase.testId, e.target.value)}
-                                    className={`w-full px-2 py-2 rounded text-sm font-medium border focus:ring-1 focus:ring-blue-500 ${
-                                      testCase.status === 'PASS' ? 'bg-green-100 text-green-800 border-green-300' :
-                                      testCase.status === 'FAIL' ? 'bg-red-100 text-red-800 border-red-300' :
-                                      testCase.status === 'BLOCKED' ? 'bg-orange-100 text-orange-800 border-orange-300' :
-                                      testCase.status === 'NA' ? 'bg-slate-100 text-slate-800 border-slate-300' :
-                                      'bg-gray-100 text-gray-800 border-gray-300'
-                                    }`}
-                                  >
-                                    <option value="NOT RUN">⏸️ NOT RUN</option>
-                                    <option value="PASS">✅ PASS</option>
-                                    <option value="FAIL">❌ FAIL</option>
-                                    <option value="BLOCKED">🚫 BLOCKED</option>
-                                    <option value="NA">N/A</option>
-                                  </select>
-                                </div>
+                              <select
+                                value={testCase.status}
+                                onChange={(e) => handleStatusChange(testCase.testId, e.target.value)}
+                                className={`w-full px-2 py-2 rounded text-sm font-medium border focus:ring-1 focus:ring-blue-500 ${
+                                  testCase.status === 'PASS' ? 'bg-green-100 text-green-800 border-green-300' :
+                                  testCase.status === 'FAIL' ? 'bg-red-100 text-red-800 border-red-300' :
+                                  testCase.status === 'BLOCKED' ? 'bg-orange-100 text-orange-800 border-orange-300' :
+                                  testCase.status === 'NA' ? 'bg-slate-100 text-slate-800 border-slate-300' :
+                                  'bg-gray-100 text-gray-800 border-gray-300'
+                                }`}
+                              >
+                                <option value="NOT RUN">⏸️ NOT RUN</option>
+                                <option value="PASS">✅ PASS</option>
+                                <option value="FAIL">❌ FAIL</option>
+                                <option value="BLOCKED">🚫 BLOCKED</option>
+                                <option value="NA">N/A</option>
+                              </select>
+                            </div>
                               </div>
                             ) : (
                               // Regular test case - show status dropdown

@@ -13,4 +13,3 @@ export { default as Testing } from './testing';
 export { default as Setup } from './setup';
 export { default as SiteInfo } from './siteInfo';
 export { default as CellTypes } from './cellTypes';
-export { default as Logs } from './logs';

@@ -54,11 +54,7 @@ app.listen(PORT, () => {
   console.log('- POST /api/cell-hardening');
   console.log('- PUT /api/cell-hardening/:site/:cellType/:cell/:day');
   console.log('- DELETE /api/cell-hardening/:site/:cellType/:cell/:day');
-  console.log('- GET /api/logging/ui-changes');
-  console.log('- GET /api/logging/user/:user');
-  console.log('- GET /api/logging/site/:site');
-  console.log('- GET /api/logging/date-range');
-  console.log('- GET /api/logging/export');
+  console.log('- POST /api/logging/activity');
   console.log('- GET /api/cell-types');
   console.log('- POST /api/cell-types');
   console.log('- PUT /api/cell-types/:cellType');
