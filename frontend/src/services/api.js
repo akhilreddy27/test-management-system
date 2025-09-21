@@ -67,4 +67,15 @@ export const cellTypesAPI = {
   delete: (cellType) => api.delete(`/cell-types/${cellType}`),
 };
 
+export const ticketsAPI = {
+  getAll: () => api.get('/tickets'),
+  getById: (id) => api.get(`/tickets/${id}`),
+  create: (ticketData) => api.post('/tickets', ticketData),
+  update: (id, ticketData) => api.put(`/tickets/${id}`, ticketData),
+  delete: (id) => api.delete(`/tickets/${id}`),
+  getByStatus: (status) => api.get(`/tickets/status/${status}`),
+  getByPriority: (priority) => api.get(`/tickets/priority/${priority}`),
+  getByAssignee: (assignee) => api.get(`/tickets/assignee/${assignee}`)
+};
+
 export default api;

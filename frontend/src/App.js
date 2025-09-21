@@ -4,6 +4,7 @@ import LoggingService from './services/loggingService';
 import Dashboard from './components/dashboard';
 import Setup from './components/setup';
 import Testing from './components/testing';
+import Tickets from './components/tickets';
 import './App.css';
 
 function App() {
@@ -52,7 +53,8 @@ function App() {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', color: 'from-blue-500 to-blue-600', disabled: true },
     { id: 'testing', label: 'Testing', color: 'from-green-500 to-green-600', disabled: false },
-    { id: 'setup', label: 'Setup', color: 'from-yellow-500 to-yellow-600', disabled: false }
+    { id: 'setup', label: 'Setup', color: 'from-yellow-500 to-yellow-600', disabled: false },
+    { id: 'tickets', label: 'Tickets', color: 'from-purple-500 to-purple-600', disabled: false }
   ];
 
   const getCurrentNavItem = () => navItems.find(item => item.id === currentView);
@@ -180,6 +182,9 @@ function App() {
                 availableCellTypes={availableCellTypes}
                 currentUser={currentUser}
               />
+            )}
+            {currentView === 'tickets' && (
+              <Tickets currentUser={currentUser} />
             )}
 
           </div>

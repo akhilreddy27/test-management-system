@@ -8,6 +8,7 @@ const loggingRoutes = require('./src/routes/logging');
 const cellTypesRoutes = require('./src/routes/cellTypes');
 const siteInfoRoutes = require('./src/routes/siteInfo');
 const imageRoutes = require('./src/routes/images');
+const ticketsRoutes = require('./src/routes/tickets');
 
 console.log('Starting server...');
 
@@ -30,6 +31,7 @@ app.use('/api/logging', loggingRoutes);
 app.use('/api/cell-types', cellTypesRoutes);
 app.use('/api/site-info', siteInfoRoutes);
 app.use('/api/images', imageRoutes);
+app.use('/api/tickets', ticketsRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {
@@ -63,4 +65,11 @@ app.listen(PORT, () => {
   console.log('- POST /api/site-info');
   console.log('- PUT /api/site-info/:id');
   console.log('- DELETE /api/site-info/:id');
+  console.log('- GET /api/tickets');
+  console.log('- POST /api/tickets');
+  console.log('- PUT /api/tickets/:id');
+  console.log('- DELETE /api/tickets/:id');
+  console.log('- GET /api/tickets/status/:status');
+  console.log('- GET /api/tickets/priority/:priority');
+  console.log('- GET /api/tickets/assignee/:assignee');
 });

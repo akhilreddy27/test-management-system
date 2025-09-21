@@ -704,6 +704,147 @@ class ExcelService {
       throw error;
     }
   }
+
+  // Tickets methods
+  readTickets() {
+    try {
+      const filePath = path.join(__dirname, '../../data/tickets.xlsx');
+      const workbook = XLSX.readFile(filePath);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json(worksheet);
+      
+      return data.map((row, index) => ({
+        id: index + 1,
+        site: row['Site'] || '',
+        ticketId: row['Ticket ID'] || '',
+        title: row['Title'] || '',
+        description: row['Description'] || '',
+        status: row['Status'] || 'Open',
+        priority: row['Priority'] || 'Medium',
+        assignee: row['Assignee'] || '',
+        reporter: row['Reporter'] || '',
+        date: row['Date'] || '',
+        tags: row['Tags'] || '',
+        createdAt: row['Created At'] || '',
+        updatedAt: row['Updated At'] || ''
+      }));
+    } catch (error) {
+      console.error('Error reading tickets:', error);
+      return [];
+    }
+  }
+
+  createTicket(ticketData) {
+    try {
+      const filePath = path.join(__dirname, '../../data/tickets.xlsx');
+      let workbook;
+      let worksheet;
+      
+      try {
+        workbook = XLSX.readFile(filePath);
+        worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      } catch (error) {
+        // File doesn't exist, create new workbook
+        workbook = XLSX.utils.book_new();
+        worksheet = XLSX.utils.json_to_sheet([]);
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Tickets');
+      }
+      
+      const existingData = XLSX.utils.sheet_to_json(worksheet);
+      const newTicket = {
+        'Site': ticketData.site,
+        'Ticket ID': ticketData.ticketId,
+        'Title': ticketData.title,
+        'Description': ticketData.description,
+        'Status': ticketData.status,
+        'Priority': ticketData.priority,
+        'Assignee': ticketData.assignee,
+        'Reporter': ticketData.reporter,
+        'Date': ticketData.date,
+        'Tags': ticketData.tags,
+        'Created At': ticketData.createdAt,
+        'Updated At': ticketData.updatedAt
+      };
+      
+      existingData.push(newTicket);
+      
+      const newWorksheet = XLSX.utils.json_to_sheet(existingData);
+      workbook.Sheets['Tickets'] = newWorksheet;
+      
+      XLSX.writeFile(workbook, filePath);
+      return true;
+    } catch (error) {
+      console.error('Error creating ticket:', error);
+      return false;
+    }
+  }
+
+  updateTicket(id, updateData) {
+    try {
+      const filePath = path.join(__dirname, '../../data/tickets.xlsx');
+      const workbook = XLSX.readFile(filePath);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json(worksheet);
+      
+      if (id > data.length || id < 1) {
+        return false;
+      }
+      
+      const ticketIndex = id - 1;
+      const existingTicket = data[ticketIndex];
+      
+      // Update only provided fields
+      const updatedTicket = {
+        ...existingTicket,
+        'Site': updateData.site !== undefined ? updateData.site : existingTicket['Site'],
+        'Ticket ID': updateData.ticketId !== undefined ? updateData.ticketId : existingTicket['Ticket ID'],
+        'Title': updateData.title !== undefined ? updateData.title : existingTicket['Title'],
+        'Description': updateData.description !== undefined ? updateData.description : existingTicket['Description'],
+        'Status': updateData.status !== undefined ? updateData.status : existingTicket['Status'],
+        'Priority': updateData.priority !== undefined ? updateData.priority : existingTicket['Priority'],
+        'Assignee': updateData.assignee !== undefined ? updateData.assignee : existingTicket['Assignee'],
+        'Reporter': updateData.reporter !== undefined ? updateData.reporter : existingTicket['Reporter'],
+        'Date': updateData.date !== undefined ? updateData.date : existingTicket['Date'],
+        'Tags': updateData.tags !== undefined ? updateData.tags : existingTicket['Tags'],
+        'Updated At': updateData.updatedAt || new Date().toISOString()
+      };
+      
+      data[ticketIndex] = updatedTicket;
+      
+      const newWorksheet = XLSX.utils.json_to_sheet(data);
+      workbook.Sheets['Tickets'] = newWorksheet;
+      
+      XLSX.writeFile(workbook, filePath);
+      return true;
+    } catch (error) {
+      console.error('Error updating ticket:', error);
+      return false;
+    }
+  }
+
+  deleteTicket(id) {
+    try {
+      const filePath = path.join(__dirname, '../../data/tickets.xlsx');
+      const workbook = XLSX.readFile(filePath);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json(worksheet);
+      
+      if (id > data.length || id < 1) {
+        return false;
+      }
+      
+      data.splice(id - 1, 1);
+      
+      const newWorksheet = XLSX.utils.json_to_sheet(data);
+      workbook.Sheets['Tickets'] = newWorksheet;
+      
+      XLSX.writeFile(workbook, filePath);
+      return true;
+    } catch (error) {
+      console.error('Error deleting ticket:', error);
+      return false;
+    }
+  }
 }
 
 module.exports = new ExcelService();
