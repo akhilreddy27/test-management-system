@@ -17,7 +17,7 @@ class SetupController {
       // 1. Get DC type and subtype from selected site
       const siteInfo = excelService.readSiteInfo();
       const selectedSite = siteInfo.find(site => {
-        const formatted = `${site.City || ''} - ${site['DC Number'] || ''}`;
+        const formatted = `${site.CITY || ''} - ${site.DC_NUMBER || ''}`;
         return formatted === siteName || site.siteName === siteName;
       });
       
@@ -28,8 +28,8 @@ class SetupController {
         });
       }
 
-      const dcType = selectedSite['DC Type'] || '';
-      const dcSubType = selectedSite['Sub Type'] || '';
+      const dcType = selectedSite.DC_TYPE || '';
+      const dcSubType = selectedSite.SUB_TYPE || '';
 
       // 2. Get all test cases
       const allTestCases = excelService.readTestCases();
@@ -199,8 +199,8 @@ class SetupController {
     try {
       const sites = excelService.readSiteInfo();
       const options = sites.map(site => ({
-        label: `${site.City || ''} - ${site['DC Number'] || ''}`.trim(),
-        value: `${site.City || ''} - ${site['DC Number'] || ''}`.trim()
+        label: `${site.CITY || ''} - ${site.DC_NUMBER || ''}`.trim(),
+        value: `${site.CITY || ''} - ${site.DC_NUMBER || ''}`.trim()
       }));
       
       res.json({

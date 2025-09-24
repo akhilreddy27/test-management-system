@@ -343,12 +343,47 @@ class TestCasesController {
         }
       }
       
+      // For now, let's return a simplified response with just the test cases
+      console.log('Debug - siteTestCases length:', siteTestCases.length);
+      console.log('Debug - relevantTestCases length:', relevantTestCases.length);
+      
+      const simplifiedTestCases = siteTestCases.map(ts => {
+        const matchingTC = relevantTestCases.find(tc => 
+          tc.cellType === ts.cellType && 
+          tc.testCase === ts.testCase
+        );
+        
+        if (matchingTC) {
+          return {
+            ...matchingTC,
+            status: ts.status,
+            cell: ts.cell,
+            phase: ts.phase,
+            uniqueTestId: ts.uniqueTestId,
+            lastModified: ts.lastModified,
+            modifiedUser: ts.modifiedUser,
+            chVolume: ts.chVolume || '',
+            chDate: ts.chDate || '',
+            vtVolume: ts.vtVolume || '',
+            vtDate: ts.vtDate || '',
+            vtStartTime: ts.vtStartTime || '',
+            vtEndTime: ts.vtEndTime || '',
+            vtAvailability: ts.vtAvailability || '',
+            liveDate: ts.liveDate || '',
+            notes: ts.notes || ''
+          };
+        }
+        return null;
+      }).filter(Boolean);
+      
+      console.log('Debug - simplifiedTestCases length:', simplifiedTestCases.length);
+
       res.json({
         success: true,
-        data: mappedTestCases,
-        count: mappedTestCases.length,
+        data: simplifiedTestCases,
+        count: simplifiedTestCases.length,
         site: site,
-        groupedData: groupedData
+        groupedData: {}
       });
       
     } catch (error) {
@@ -678,8 +713,8 @@ class TestCasesController {
       
       // Filter sites based on DC Type and Sub Type
       const matchingSites = sites.filter(site => 
-        site['DC Type'] === testCase.dcType && 
-        site['Sub Type'] === testCase.subType
+        site['DC_TYPE'] === testCase.dcType && 
+        site['SUB_TYPE'] === testCase.subType
       );
       
       matchingSites.forEach(site => {
@@ -691,7 +726,7 @@ class TestCasesController {
           const cellNames = [`${testCase.cellType} 123`, `${testCase.cellType} 456`];
           
           cellNames.forEach(cellName => {
-            const uniqueTestId = `${site.City}_${phase}_${testCase.cellType}_${cellName}_${testCase.testId}`.replace(/\s+/g, '_');
+            const uniqueTestId = `${site.CITY}_${phase}_${testCase.cellType}_${cellName}_${testCase.testId}`.replace(/\s+/g, '_');
             
             // Create driveway configuration
             let drivewayConfig = {};
@@ -705,7 +740,7 @@ class TestCasesController {
               dcType: testCase.dcType,
               subType: testCase.subType,
               testId: testCase.testId,
-              site: `${site.City} - ${site['DC Number']}`,
+              site: `${site.CITY} - ${site['DC_NUMBER']}`,
               phase: phase,
               cellType: testCase.cellType,
               cell: cellName,

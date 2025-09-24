@@ -23,6 +23,9 @@ router.get('/:id', async (req, res) => {
 // POST /api/tickets - Create a new ticket
 router.post('/', async (req, res) => {
   try {
+    console.log('Debug - Route received request body:', JSON.stringify(req.body, null, 2));
+    console.log('Debug - Route cell value:', req.body.cell);
+    console.log('Debug - Route cell type:', typeof req.body.cell);
     await ticketsController.createTicket(req, res);
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

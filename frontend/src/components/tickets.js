@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ticketsAPI, setupAPI } from '../services/api';
+import { ticketsAPI, setupAPI, cellTypesAPI } from '../services/api';
 import LoggingService from '../services/loggingService';
 import { showSuccessToast, showErrorToast } from '../services/toastService';
 
@@ -20,7 +20,8 @@ const Tickets = ({ currentUser = 'Unknown' }) => {
     assignee: '',
     reporter: currentUser,
     date: new Date().toISOString().split('T')[0],
-    tags: ''
+    tags: '',
+    cell: ''
   });
   
   const [editingTicket, setEditingTicket] = useState(null);
@@ -31,6 +32,7 @@ const Tickets = ({ currentUser = 'Unknown' }) => {
   const [isSiteDropdownOpen, setIsSiteDropdownOpen] = useState(false);
   const [siteSearchTerm, setSiteSearchTerm] = useState('');
   const [selectedSiteIndex, setSelectedSiteIndex] = useState(-1);
+  const [availableCells, setAvailableCells] = useState([]);
 
   // Status options
   const statusOptions = ['Open', 'In Progress', 'Resolved', 'Closed', 'Cancelled'];
@@ -39,6 +41,7 @@ const Tickets = ({ currentUser = 'Unknown' }) => {
   useEffect(() => {
     loadTickets();
     loadSites();
+    loadCellTypes();
     LoggingService.logPageView('tickets', currentUser);
   }, [currentUser]);
 
@@ -122,6 +125,22 @@ const Tickets = ({ currentUser = 'Unknown' }) => {
     }
   };
 
+  const loadCellTypes = async () => {
+    try {
+      const response = await cellTypesAPI.getAll();
+      if (response.data.success) {
+        const cellTypes = response.data.data || [];
+        setAvailableCells(cellTypes);
+      } else {
+        console.warn('Failed to load cell types:', response.data.message);
+        setAvailableCells([]);
+      }
+    } catch (error) {
+      console.error('Error loading cell types:', error);
+      setAvailableCells([]);
+    }
+  };
+
   const loadTickets = async () => {
     try {
       setLoading(true);
@@ -189,7 +208,8 @@ const Tickets = ({ currentUser = 'Unknown' }) => {
         assignee: '',
         reporter: currentUser,
         date: new Date().toISOString().split('T')[0],
-        tags: ''
+        tags: '',
+        cell: ''
       });
       setEditingTicket(null);
       setShowForm(false);
@@ -227,7 +247,8 @@ const Tickets = ({ currentUser = 'Unknown' }) => {
         assignee: ticket.assignee || '',
         reporter: ticket.reporter || currentUser,
         date: ticket.date || new Date().toISOString().split('T')[0],
-        tags: ticket.tags || ''
+        tags: ticket.tags || '',
+        cell: ticket.cell || ''
       });
       setSelectedSite(ticket.site || '');
       setSiteSearchTerm('');
@@ -263,7 +284,8 @@ const Tickets = ({ currentUser = 'Unknown' }) => {
       assignee: '',
       reporter: currentUser,
       date: new Date().toISOString().split('T')[0],
-      tags: ''
+      tags: '',
+      cell: ''
     });
     setEditingTicket(null);
     setShowForm(false);
@@ -423,92 +445,106 @@ const Tickets = ({ currentUser = 'Unknown' }) => {
           </h2>
           
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Site Selection */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Site *
-              </label>
-              <div className="relative site-dropdown-container">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Site Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Site *
+                </label>
+                <div className="relative site-dropdown-container">
+                  <input
+                    type="text"
+                    name="site"
+                    value={siteSearchTerm || formData.site}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSiteSearchTerm(value);
+                      // Only update formData.site if it's a valid selection (not just typing)
+                      // The actual site value will be set when user selects from dropdown
+                      setIsSiteDropdownOpen(true);
+                      setSelectedSiteIndex(-1);
+                    }}
+                    onFocus={() => setIsSiteDropdownOpen(true)}
+                    onKeyDown={handleSiteKeyDown}
+                    placeholder="Search by site name or DC number..."
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  
+                  {/* Dropdown arrow */}
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                    <svg
+                      className={`h-5 w-5 text-gray-400 transform transition-transform ${
+                        isSiteDropdownOpen ? 'rotate-180' : ''
+                      }`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+
+                  {/* Dropdown menu */}
+                  {isSiteDropdownOpen && (
+                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                      {filteredSites.length > 0 ? (
+                        filteredSites.map((site, index) => (
+                          <button
+                            key={index}
+                            type="button"
+                            onClick={() => handleSiteSelect(site)}
+                            className={`w-full px-3 py-2 text-left focus:outline-none text-sm ${
+                              index === selectedSiteIndex 
+                                ? 'bg-blue-100 text-blue-900' 
+                                : 'hover:bg-gray-100'
+                            }`}
+                          >
+                            <div className="flex flex-col">
+                              <div className="font-medium">
+                                {highlightSearchTerm(site.label, siteSearchTerm)}
+                              </div>
+                              {(site.network || site.state) && (
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {site.network && (
+                                    <span className="inline-block bg-gray-100 px-2 py-1 rounded mr-2">
+                                      {highlightSearchTerm(site.network, siteSearchTerm)}
+                                    </span>
+                                  )}
+                                  {site.state && (
+                                    <span className="text-gray-400">
+                                      {highlightSearchTerm(site.state, siteSearchTerm)}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-3 py-2 text-gray-500 text-sm">
+                          No sites found
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Cell Input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Cell
+                </label>
                 <input
                   type="text"
-                  name="site"
-                  value={siteSearchTerm || formData.site}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setSiteSearchTerm(value);
-                    // Only update formData.site if it's a valid selection (not just typing)
-                    // The actual site value will be set when user selects from dropdown
-                    setIsSiteDropdownOpen(true);
-                    setSelectedSiteIndex(-1);
-                  }}
-                  onFocus={() => setIsSiteDropdownOpen(true)}
-                  onKeyDown={handleSiteKeyDown}
-                  placeholder="Search by site name or DC number..."
-                  required
+                  name="cell"
+                  value={formData.cell}
+                  onChange={handleInputChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Enter cell name (e.g., FLIB 210, AIB 101)"
                 />
-                
-                {/* Dropdown arrow */}
-                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  <svg
-                    className={`h-5 w-5 text-gray-400 transform transition-transform ${
-                      isSiteDropdownOpen ? 'rotate-180' : ''
-                    }`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-
-                {/* Dropdown menu */}
-                {isSiteDropdownOpen && (
-                  <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-                    {filteredSites.length > 0 ? (
-                      filteredSites.map((site, index) => (
-                        <button
-                          key={index}
-                          type="button"
-                          onClick={() => handleSiteSelect(site)}
-                          className={`w-full px-3 py-2 text-left focus:outline-none text-sm ${
-                            index === selectedSiteIndex 
-                              ? 'bg-blue-100 text-blue-900' 
-                              : 'hover:bg-gray-100'
-                          }`}
-                        >
-                          <div className="flex flex-col">
-                            <div className="font-medium">
-                              {highlightSearchTerm(site.label, siteSearchTerm)}
-                            </div>
-                            {(site.network || site.state) && (
-                              <div className="text-xs text-gray-500 mt-1">
-                                {site.network && (
-                                  <span className="inline-block bg-gray-100 px-2 py-1 rounded mr-2">
-                                    {highlightSearchTerm(site.network, siteSearchTerm)}
-                                  </span>
-                                )}
-                                {site.state && (
-                                  <span className="text-gray-400">
-                                    {highlightSearchTerm(site.state, siteSearchTerm)}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </button>
-                      ))
-                    ) : (
-                      <div className="px-3 py-2 text-gray-500 text-sm">
-                        No sites found
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Ticket ID */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -705,6 +741,9 @@ const Tickets = ({ currentUser = 'Unknown' }) => {
                     Site
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Cell
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Ticket ID
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -732,6 +771,9 @@ const Tickets = ({ currentUser = 'Unknown' }) => {
                   <tr key={ticket.id || index} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {ticket.site || 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {ticket.cell || 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {ticket.ticketId}

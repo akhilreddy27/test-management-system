@@ -1274,7 +1274,7 @@ const Testing = ({ currentUser }) => {
                                 <div className="flex items-center space-x-2 sm:space-x-3 w-full sm:w-auto">
                                 <div className="text-left flex-1 min-w-0">
                                   <h5 className="font-medium text-gray-900 text-sm leading-tight">
-                                      First cell only
+                                      First Cell Only
                                   </h5>
                                   <p className="text-xs text-gray-600 leading-tight">
                                     {firstCellTestCases.length} test cases (test only on first cell)

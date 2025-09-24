@@ -11,12 +11,12 @@ class SiteInfoController {
       // Transform data to include IDs and proper field names
       const siteInfoList = data.map((row, index) => ({
         id: index + 1,
-        network: row['Network'] || '',
-        dcType: row['DC Type'] || '',
-        subType: row['Sub Type'] || '',
-        dcNumber: row['DC Number'] || '',
-        city: row['City'] || '',
-        state: row['State'] || ''
+        network: row['NETWORK'] || '',
+        dcType: row['DC_TYPE'] || '',
+        subType: row['SUB_TYPE'] || '',
+        dcNumber: row['DC_NUMBER'] || '',
+        city: row['CITY'] || '',
+        state: row['STATE'] || ''
       }));
 
       res.json({
@@ -56,18 +56,18 @@ class SiteInfoController {
 
       // Add new site info
       const newSiteInfo = {
-        'Network': network,
-        'DC Type': dcType,
-        'Sub Type': subType,
-        'DC Number': dcNumber,
-        'City': city,
-        'State': state
+        'NETWORK': network,
+        'DC_TYPE': dcType,
+        'SUB_TYPE': subType,
+        'DC_NUMBER': dcNumber,
+        'CITY': city,
+        'STATE': state
       };
 
       existingData.push(newSiteInfo);
 
       // Write back to Excel
-      await excelService.writeExcel(SITE_INFO_FILE, existingData, ['Network', 'DC Type', 'Sub Type', 'DC Number', 'City', 'State']);
+      await excelService.writeExcel(SITE_INFO_FILE, existingData, ['NETWORK', 'DC_TYPE', 'SUB_TYPE', 'DC_NUMBER', 'CITY', 'STATE']);
 
       res.json({
         success: true,
@@ -118,16 +118,16 @@ class SiteInfoController {
 
       // Update the row
       existingData[rowIndex] = {
-        'Network': network,
-        'DC Type': dcType,
-        'Sub Type': subType,
-        'DC Number': dcNumber,
-        'City': city,
-        'State': state
+        'NETWORK': network,
+        'DC_TYPE': dcType,
+        'SUB_TYPE': subType,
+        'DC_NUMBER': dcNumber,
+        'CITY': city,
+        'STATE': state
       };
 
       // Write back to Excel
-      await excelService.writeExcel(SITE_INFO_FILE, existingData, ['Network', 'DC Type', 'Sub Type', 'DC Number', 'City', 'State']);
+      await excelService.writeExcel(SITE_INFO_FILE, existingData, ['NETWORK', 'DC_TYPE', 'SUB_TYPE', 'DC_NUMBER', 'CITY', 'STATE']);
 
       res.json({
         success: true,
@@ -171,7 +171,7 @@ class SiteInfoController {
       existingData.splice(rowIndex, 1);
 
       // Write back to Excel
-      await excelService.writeExcel(SITE_INFO_FILE, existingData, ['Network', 'DC Type', 'Sub Type', 'DC Number', 'City', 'State']);
+      await excelService.writeExcel(SITE_INFO_FILE, existingData, ['NETWORK', 'DC_TYPE', 'SUB_TYPE', 'DC_NUMBER', 'CITY', 'STATE']);
 
       res.json({
         success: true,

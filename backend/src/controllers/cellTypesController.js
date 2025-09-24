@@ -11,7 +11,7 @@ class CellTypesController {
       console.log('Site info loaded:', siteInfo);
       
       // Get unique DC Types from site info
-      const dcTypes = [...new Set(siteInfo.map(site => site['DC Type']).filter(Boolean))].sort();
+      const dcTypes = [...new Set(siteInfo.map(site => site['DC_TYPE']).filter(Boolean))].sort();
       console.log('Extracted DC Types:', dcTypes);
       
       res.json({

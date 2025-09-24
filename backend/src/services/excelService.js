@@ -22,18 +22,18 @@ class ExcelService {
         'Time': new Date(timestamp).toLocaleTimeString(),
         'User': changeData.user || 'Unknown',
         'Action': changeData.action || 'Unknown',
-        'Module': changeData.module || 'Unknown',
-        'Site': changeData.site || '',
-        'Phase': changeData.phase || '',
-        'Cell Type': changeData.cellType || '',
-        'Cell': changeData.cell || '',
-        'Test Case': changeData.testCase || '',
-        'Test ID': changeData.testId || '',
-        'Old Value': changeData.oldValue || '',
-        'New Value': changeData.newValue || '',
-        'Details': changeData.details || '',
-        'IP Address': changeData.ipAddress || '',
-        'User Agent': changeData.userAgent || ''
+        'MODULE': changeData.module || 'Unknown',
+        'SITE': changeData.site || '',
+        'PHASE': changeData.phase || '',
+        'CELL_TYPE': changeData.cellType || '',
+        'CELL': changeData.cell || '',
+        'TEST_CASE': changeData.testCase || '',
+        'TEST_ID': changeData.testId || '',
+        'OLD_VALUE': changeData.oldValue || '',
+        'NEW_VALUE': changeData.newValue || '',
+        'DETAILS': changeData.details || '',
+        'IP_ADDRESS': changeData.ipAddress || '',
+        'USER_AGENT': changeData.userAgent || ''
       };
 
       let existingLogs = [];
@@ -201,25 +201,25 @@ class ExcelService {
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
       
       return jsonData.map(row => ({
-        dcType: row['DC Type'] || '',
-        subType: row['Sub Type'] || '',
-        cellType: row['Cell Type'],
-        testCase: row['Test Case'],
-        testId: row['Test ID'],
-        scope: row['Scope'],
-        phase: row['Phase'],
-        steps: row['Steps'] || '',
-        description: row['Description'] || '',
-        multiDriveway: row['Multi Driveway'] === 'true' || row['Multi Driveway'] === true || row['Multi Driveway'] === 'TRUE' || row['Multi Driveway'] === 1,
-        drivewayType: row['Driveway Type'] || 'N/A',
-        combinedTest: row['Combined Test'] === 'true' || row['Combined Test'] === true || row['Combined Test'] === 'TRUE' || row['Combined Test'] === 1,
+        dcType: row['DC_TYPE'] || '',
+        subType: row['SUB_TYPE'] || '',
+        cellType: row['CELL_TYPE'],
+        testCase: row['TEST_CASE'],
+        testId: row['TEST_ID'],
+        scope: row['SCOPE'],
+        phase: row['PHASE'],
+        steps: row['STEPS'] || '',
+        description: row['DESCRIPTION'] || '',
+        multiDriveway: row['MULTI_DRIVEWAY'] === 'true' || row['MULTI_DRIVEWAY'] === true || row['MULTI_DRIVEWAY'] === 'TRUE' || row['MULTI_DRIVEWAY'] === 1,
+        drivewayType: row['DRIVEWAY_TYPE'] || 'N/A',
+        combinedTest: row['COMBINED_TEST'] === 'true' || row['COMBINED_TEST'] === true || row['COMBINED_TEST'] === 'TRUE' || row['COMBINED_TEST'] === 1,
         // New columns you added
-        cells: row['Cells'] || '',
-        image: row['Image'] || '',
-        requirements: row['Requirements'] || '',
+        cells: row['CELLS'] || '',
+        image: row['IMAGE'] || '',
+        requirements: row['REQUIREMENTS'] || '',
         // Audit columns
-        lastModified: row['Last Modified'] || null,
-        modifiedUser: row['Modified User'] || null
+        lastModified: row['LAST_MODIFIED'] || null,
+        modifiedUser: row['MODIFIED_USER'] || null
       }));
       
     } catch (error) {
@@ -233,23 +233,23 @@ class ExcelService {
       const filePath = path.join(this.dataPath, 'test_cases.xlsx');
       
       const excelData = testCasesData.map(testCase => ({
-        'DC Type': testCase.dcType || '',
-        'Sub Type': testCase.subType || '',
-        'Cell Type': testCase.cellType,
-        'Test Case': testCase.testCase,
-        'Test ID': testCase.testId,
-        'Scope': testCase.scope,
-        'Phase': testCase.phase,
-        'Cells': testCase.cells || '',
-        'Description': testCase.expectedOutput || '',
-        'Requirements': testCase.requirements || '',
-        'Steps': testCase.steps || '',
-        'Multi Driveway': testCase.multiDriveway ? 'true' : 'false',
-        'Driveway Type': testCase.drivewayType || 'N/A',
-        'Combined Test': testCase.combinedTest ? 'true' : 'false',
-        'Image': testCase.image || '',
-        'Last Modified': testCase.lastModified || '',
-        'Modified User': testCase.modifiedUser || ''
+        'DC_TYPE': testCase.dcType || '',
+        'SUB_TYPE': testCase.subType || '',
+        'CELL_TYPE': testCase.cellType,
+        'TEST_CASE': testCase.testCase,
+        'TEST_ID': testCase.testId,
+        'SCOPE': testCase.scope,
+        'PHASE': testCase.phase,
+        'CELLS': testCase.cells || '',
+        'DESCRIPTION': testCase.expectedOutput || '',
+        'REQUIREMENTS': testCase.requirements || '',
+        'STEPS': testCase.steps || '',
+        'MULTI_DRIVEWAY': testCase.multiDriveway ? 'true' : 'false',
+        'DRIVEWAY_TYPE': testCase.drivewayType || 'N/A',
+        'COMBINED_TEST': testCase.combinedTest ? 'true' : 'false',
+        'IMAGE': testCase.image || '',
+        'LAST_MODIFIED': testCase.lastModified || '',
+        'MODIFIED_USER': testCase.modifiedUser || ''
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(excelData);
@@ -282,31 +282,33 @@ class ExcelService {
       
       return jsonData.map(row => {
         return {
-          dcType: row['dcType'] || '',
-          subType: row['subType'] || '',
-          site: row['site'],
-          phase: row['phase'],
-          cellType: row['cellType'],
-          cell: row['cell'] || '',
-          testCase: row['testCase'],
-          testId: row['testId'],
-          uniqueTestId: row['uniqueTestId'] || '',
-          scope: row['scope'],
-          cells: row['cells'] || 'All', // Add cells column
-          status: row['status'] || 'NOT RUN',
-          lastModified: row['lastModified'],
-          modifiedUser: row['modifiedUser'],
-          drivewayConfig: row['drivewayConfig'] || '',
-          multiDriveway: row['multiDriveway'] === 'true' || row['multiDriveway'] === true || row['multiDriveway'] === 'TRUE' || row['multiDriveway'] === 1,
-          vtVolume: row['vtVolume'] || '',
-          vtDate: row['vtDate'] || '',
-          vtStartTime: row['vtStartTime'] || '',
-          vtEndTime: row['vtEndTime'] || '',
-          vtAvailability: row['vtAvailability'] || '',
-          chVolume: row['chVolume'] || '',
-          chDate: row['chDate'] || '',
-          liveDate: row['liveDate'] || '',
-          notes: row['notes'] || ''
+          // Handle both old and new header formats
+          dcType: row['DCTYPE'] || row['dcType'] || '',
+          subType: row['SUBTYPE'] || row['subType'] || '',
+          site: row['SITE'] || row['site'],
+          phase: row['PHASE'] || row['phase'],
+          cellType: row['CELLTYPE'] || row['cellType'],
+          cell: row['CELL'] || row['cell'] || '',
+          testCase: row['TESTCASE'] || row['testCase'],
+          testId: row['TESTID'] || row['testId'],
+          uniqueTestId: row['UNIQUETESTID'] || row['uniqueTestId'] || '',
+          scope: row['SCOPE'] || row['scope'],
+          cells: row['CELLS'] || row['cells'] || 'All',
+          status: row['STATUS'] || row['status'] || 'NOT RUN',
+          lastModified: row['LASTMODIFIED'] || row['lastModified'],
+          modifiedUser: row['MODIFIEDUSER'] || row['modifiedUser'],
+          drivewayConfig: row['DRIVEWAYCONFIG'] || row['drivewayConfig'] || '',
+          multiDriveway: (row['MULTIDRIVEWAY'] === 'true' || row['MULTIDRIVEWAY'] === true || row['MULTIDRIVEWAY'] === 'TRUE' || row['MULTIDRIVEWAY'] === 1) ||
+                        (row['multiDriveway'] === 'true' || row['multiDriveway'] === true || row['multiDriveway'] === 'TRUE' || row['multiDriveway'] === 1),
+          vtVolume: row['VTVOLUME'] || row['vtVolume'] || '',
+          vtDate: row['VTDATE'] || row['vtDate'] || '',
+          vtStartTime: row['VTSTARTTIME'] || row['vtStartTime'] || '',
+          vtEndTime: row['VTENDTIME'] || row['vtEndTime'] || '',
+          vtAvailability: row['VTAVAILABILITY'] || row['vtAvailability'] || '',
+          chVolume: row['CHVOLUME'] || row['chVolume'] || '',
+          chDate: row['CHDATE'] || row['chDate'] || '',
+          liveDate: row['LIVEDATE'] || row['liveDate'] || '',
+          notes: row['NOTES'] || row['notes'] || ''
         };
       });
       
@@ -322,31 +324,31 @@ class ExcelService {
       
       const excelData = statusData.map(entry => {
         const excelRow = {
-          'dcType': entry.dcType || '',
-          'subType': entry.subType || '',
-          'site': entry.site,
-          'phase': entry.phase,
-          'cellType': entry.cellType,
-          'cell': entry.cell || '',
-          'testCase': entry.testCase,
-          'testId': entry.testId || '',
-          'uniqueTestId': entry.uniqueTestId || '',
-          'scope': entry.scope || '',
-          'cells': entry.cells || 'All', // Add cells column
-          'status': entry.status,
-          'lastModified': entry.lastModified ? new Date(entry.lastModified).toLocaleString() : '',
-          'modifiedUser': entry.modifiedUser || '',
-          'drivewayConfig': entry.drivewayConfig || '',
-          'multiDriveway': entry.multiDriveway ? 'true' : 'false',
-          'chVolume': entry.chVolume || '',
-          'chDate': entry.chDate || '',
-          'vtVolume': entry.vtVolume || '',
-          'vtDate': entry.vtDate || '',
-          'vtStartTime': entry.vtStartTime || '',
-          'vtEndTime': entry.vtEndTime || '',
-          'vtAvailability': entry.vtAvailability || '',
-          'liveDate': entry.liveDate || '',
-          'notes': entry.notes || ''
+          'DCTYPE': entry.dcType || '',
+          'SUBTYPE': entry.subType || '',
+          'SITE': entry.site,
+          'PHASE': entry.phase,
+          'CELLTYPE': entry.cellType,
+          'CELL': entry.cell || '',
+          'TESTCASE': entry.testCase,
+          'TESTID': entry.testId || '',
+          'UNIQUETESTID': entry.uniqueTestId || '',
+          'SCOPE': entry.scope || '',
+          'CELLS': entry.cells || 'All',
+          'STATUS': entry.status,
+          'LASTMODIFIED': entry.lastModified ? new Date(entry.lastModified).toLocaleString() : '',
+          'MODIFIEDUSER': entry.modifiedUser || '',
+          'DRIVEWAYCONFIG': entry.drivewayConfig || '',
+          'MULTIDRIVEWAY': entry.multiDriveway ? 'true' : 'false',
+          'CHVOLUME': entry.chVolume || '',
+          'CHDATE': entry.chDate || '',
+          'VTVOLUME': entry.vtVolume || '',
+          'VTDATE': entry.vtDate || '',
+          'VTSTARTTIME': entry.vtStartTime || '',
+          'VTENDTIME': entry.vtEndTime || '',
+          'VTAVAILABILITY': entry.vtAvailability || '',
+          'LIVEDATE': entry.liveDate || '',
+          'NOTES': entry.notes || ''
         };
 
         return excelRow;
@@ -374,34 +376,34 @@ class ExcelService {
       
       const excelData = [
         {
-          'Submission ID': resultsData.submissionId,
-          'Site': resultsData.site,
-          'Submitted By': resultsData.submittedBy,
-          'Submitted At': new Date(resultsData.submittedAt).toLocaleString(),
-          'Total Tests': resultsData.totalTests,
-          'Passed Tests': resultsData.passedTests,
-          'Pass Rate': `${Math.round((resultsData.passedTests / resultsData.totalTests) * 100)}%`
+          'SUBMISSION_ID': resultsData.submissionId,
+          'SITE': resultsData.site,
+          'SUBMITTED_BY': resultsData.submittedBy,
+          'SUBMITTED_AT': new Date(resultsData.submittedAt).toLocaleString(),
+          'TOTAL_TESTS': resultsData.totalTests,
+          'PASSED_TESTS': resultsData.passedTests,
+          'PASS_RATE': `${Math.round((resultsData.passedTests / resultsData.totalTests) * 100)}%`
         },
         {},
         {
-          'Cell Type': 'Cell Type',
-          'Cell': 'Cell',
-          'Test Case': 'Test Case',
-          'Case ID': 'Case ID',
-          'Status': 'Status',
-          'Phase': 'Phase',
-          'Last Modified': 'Last Modified',
-          'Modified User': 'Modified User'
+          'CELL_TYPE': 'Cell Type',
+          'CELL': 'Cell',
+          'TEST_CASE': 'Test Case',
+          'CASE_ID': 'Case ID',
+          'STATUS': 'Status',
+          'PHASE': 'Phase',
+          'LAST_MODIFIED': 'Last Modified',
+          'MODIFIED_USER': 'Modified User'
         },
         ...resultsData.results.map(result => ({
-          'Cell Type': result.cellType,
-          'Cell': result.cell,
-          'Test Case': result.testCase,
-          'Case ID': result.caseId,
-          'Status': result.status,
-          'Phase': result.phase,
-          'Last Modified': result.lastModified ? new Date(result.lastModified).toLocaleString() : '',
-          'Modified User': result.modifiedUser || ''
+          'CELL_TYPE': result.cellType,
+          'CELL': result.cell,
+          'TEST_CASE': result.testCase,
+          'CASE_ID': result.caseId,
+          'STATUS': result.status,
+          'PHASE': result.phase,
+          'LAST_MODIFIED': result.lastModified ? new Date(result.lastModified).toLocaleString() : '',
+          'MODIFIED_USER': result.modifiedUser || ''
         }))
       ];
 
@@ -435,23 +437,23 @@ class ExcelService {
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
       
       return jsonData.map(row => {
-        const typesString = row['Types'] || '';
+        const typesString = row['TYPES'] || '';
         const drivewayTypes = typesString !== 'NA' ? typesString.split(',').map(t => t.trim()).filter(t => t && t !== '') : [];
         
-        const drivewayCount = row['Driveway Count'] === 'NA' ? 1 : parseInt(row['Driveway Count']) || 1;
+        const drivewayCount = row['DRIVEWAY_COUNT'] === 'NA' ? 1 : parseInt(row['DRIVEWAY_COUNT']) || 1;
         
         return {
-          cellType: row['Cell Type'] || '',
-          dcType: row['DC Type'] || '',
+          cellType: row['CELL_TYPE'] || '',
+          dcType: row['DC_TYPE'] || '',
 
-          hasMultipleDriveways: row['Multiple Driveways'] === true || row['Multiple Driveways'] === 'true' || row['Multiple Driveways'] === 'TRUE',
+          hasMultipleDriveways: row['MULTIPLE_DRIVEWAYS'] === true || row['MULTIPLE_DRIVEWAYS'] === 'true' || row['MULTIPLE_DRIVEWAYS'] === 'TRUE',
           numberOfDriveways: drivewayCount,
           drivewayTypes: drivewayTypes,
           driveway1Type: drivewayTypes[0] || '',
           driveway2Type: drivewayTypes[1] || '',
           driveway3Type: drivewayTypes[2] || '',
           driveway4Type: drivewayTypes[3] || '',
-          description: row['Description'] || '',
+          description: row['DESCRIPTION'] || '',
 
         };
       });
@@ -467,13 +469,13 @@ class ExcelService {
       const filePath = path.join(this.dataPath, 'cell_types.xlsx');
       
       const excelData = cellTypesData.map(cellType => ({
-        'Cell Type': cellType['Cell Type'] || cellType.cellType,
-        'DC Type': cellType['DC Type'] || cellType.dcType || '',
+        'CELL_TYPE': cellType['CELL_TYPE'] || cellType.cellType,
+        'DC_TYPE': cellType['DC_TYPE'] || cellType.dcType || '',
 
-        'Multiple Driveways': cellType['Multiple Driveways'] || cellType.hasMultipleDriveways,
-        'Driveway Count': cellType['Driveway Count'] || cellType.numberOfDriveways,
-        'Types': cellType['Types'] || (cellType.drivewayTypes ? cellType.drivewayTypes.join(', ') : 'NA'),
-        'Description': cellType['Description'] || cellType.description || '',
+        'MULTIPLE_DRIVEWAYS': cellType['MULTIPLE_DRIVEWAYS'] || cellType.hasMultipleDriveways,
+        'DRIVEWAY_COUNT': cellType['DRIVEWAY_COUNT'] || cellType.numberOfDriveways,
+        'TYPES': cellType['TYPES'] || (cellType.drivewayTypes ? cellType.drivewayTypes.join(', ') : 'NA'),
+        'DESCRIPTION': cellType['DESCRIPTION'] || cellType.description || '',
 
       }));
 
@@ -535,12 +537,12 @@ class ExcelService {
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
       
       return jsonData.map(row => ({
-        Network: row['Network'] || '',
-        'DC Type': row['DC Type'] || '',
-        'Sub Type': row['Sub Type'] || '',
-        'DC Number': row['DC Number'] || '',
-        City: row['City'] || '',
-        State: row['State'] || ''
+        NETWORK: row['NETWORK'] || '',
+        DC_TYPE: row['DC_TYPE'] || '',
+        SUB_TYPE: row['SUB_TYPE'] || '',
+        DC_NUMBER: row['DC_NUMBER'] || '',
+        CITY: row['CITY'] || '',
+        STATE: row['STATE'] || ''
       }));
       
     } catch (error) {
@@ -715,18 +717,19 @@ class ExcelService {
       
       return data.map((row, index) => ({
         id: index + 1,
-        site: row['Site'] || '',
-        ticketId: row['Ticket ID'] || '',
-        title: row['Title'] || '',
-        description: row['Description'] || '',
-        status: row['Status'] || 'Open',
-        priority: row['Priority'] || 'Medium',
-        assignee: row['Assignee'] || '',
-        reporter: row['Reporter'] || '',
-        date: row['Date'] || '',
-        tags: row['Tags'] || '',
-        createdAt: row['Created At'] || '',
-        updatedAt: row['Updated At'] || ''
+        site: row['SITE'] || '',
+        ticketId: row['TICKET_ID'] || '',
+        title: row['TITLE'] || '',
+        description: row['DESCRIPTION'] || '',
+        status: row['STATUS'] || 'Open',
+        priority: row['PRIORITY'] || 'Medium',
+        assignee: row['ASSIGNEE'] || '',
+        reporter: row['REPORTER'] || '',
+        date: row['DATE'] || '',
+        tags: row['TAGS'] || '',
+        cell: row['CELL'] || '',
+        createdAt: row['CREATED_AT'] || '',
+        updatedAt: row['UPDATED_AT'] || ''
       }));
     } catch (error) {
       console.error('Error reading tickets:', error);
@@ -736,6 +739,11 @@ class ExcelService {
 
   createTicket(ticketData) {
     try {
+      // Debug: Log the received data
+      console.log('Debug - Excel service received ticket data:', JSON.stringify(ticketData, null, 2));
+      console.log('Debug - Cell value in Excel service:', ticketData.cell);
+      console.log('Debug - Cell type in Excel service:', typeof ticketData.cell);
+      
       const filePath = path.join(__dirname, '../../data/tickets.xlsx');
       let workbook;
       let worksheet;
@@ -752,19 +760,22 @@ class ExcelService {
       
       const existingData = XLSX.utils.sheet_to_json(worksheet);
       const newTicket = {
-        'Site': ticketData.site,
-        'Ticket ID': ticketData.ticketId,
-        'Title': ticketData.title,
-        'Description': ticketData.description,
-        'Status': ticketData.status,
-        'Priority': ticketData.priority,
-        'Assignee': ticketData.assignee,
-        'Reporter': ticketData.reporter,
-        'Date': ticketData.date,
-        'Tags': ticketData.tags,
-        'Created At': ticketData.createdAt,
-        'Updated At': ticketData.updatedAt
+        'SITE': ticketData.site || '',
+        'CELL': ticketData.cell || '', // Ensure cell is never undefined
+        'TICKET_ID': ticketData.ticketId,
+        'TITLE': ticketData.title,
+        'DESCRIPTION': ticketData.description,
+        'STATUS': ticketData.status,
+        'PRIORITY': ticketData.priority,
+        'ASSIGNEE': ticketData.assignee,
+        'REPORTER': ticketData.reporter,
+        'DATE': ticketData.date,
+        'TAGS': ticketData.tags,
+        'CREATED_AT': ticketData.createdAt,
+        'UPDATED_AT': ticketData.updatedAt
       };
+      
+      console.log('Debug - New ticket object before saving:', JSON.stringify(newTicket, null, 2));
       
       existingData.push(newTicket);
       
@@ -796,17 +807,18 @@ class ExcelService {
       // Update only provided fields
       const updatedTicket = {
         ...existingTicket,
-        'Site': updateData.site !== undefined ? updateData.site : existingTicket['Site'],
-        'Ticket ID': updateData.ticketId !== undefined ? updateData.ticketId : existingTicket['Ticket ID'],
-        'Title': updateData.title !== undefined ? updateData.title : existingTicket['Title'],
-        'Description': updateData.description !== undefined ? updateData.description : existingTicket['Description'],
-        'Status': updateData.status !== undefined ? updateData.status : existingTicket['Status'],
-        'Priority': updateData.priority !== undefined ? updateData.priority : existingTicket['Priority'],
-        'Assignee': updateData.assignee !== undefined ? updateData.assignee : existingTicket['Assignee'],
-        'Reporter': updateData.reporter !== undefined ? updateData.reporter : existingTicket['Reporter'],
-        'Date': updateData.date !== undefined ? updateData.date : existingTicket['Date'],
-        'Tags': updateData.tags !== undefined ? updateData.tags : existingTicket['Tags'],
-        'Updated At': updateData.updatedAt || new Date().toISOString()
+        'SITE': updateData.site !== undefined ? updateData.site : existingTicket['SITE'],
+        'CELL': updateData.cell !== undefined ? (updateData.cell || '') : (existingTicket['CELL'] || ''),
+        'TICKET_ID': updateData.ticketId !== undefined ? updateData.ticketId : existingTicket['TICKET_ID'],
+        'TITLE': updateData.title !== undefined ? updateData.title : existingTicket['TITLE'],
+        'DESCRIPTION': updateData.description !== undefined ? updateData.description : existingTicket['DESCRIPTION'],
+        'STATUS': updateData.status !== undefined ? updateData.status : existingTicket['STATUS'],
+        'PRIORITY': updateData.priority !== undefined ? updateData.priority : existingTicket['PRIORITY'],
+        'ASSIGNEE': updateData.assignee !== undefined ? updateData.assignee : existingTicket['ASSIGNEE'],
+        'REPORTER': updateData.reporter !== undefined ? updateData.reporter : existingTicket['REPORTER'],
+        'DATE': updateData.date !== undefined ? updateData.date : existingTicket['DATE'],
+        'TAGS': updateData.tags !== undefined ? updateData.tags : existingTicket['TAGS'],
+        'UPDATED_AT': updateData.updatedAt || new Date().toISOString()
       };
       
       data[ticketIndex] = updatedTicket;

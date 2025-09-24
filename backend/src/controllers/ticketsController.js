@@ -55,6 +55,11 @@ class TicketsController {
     try {
       const ticketData = req.body;
       
+      // Debug: Log the received data
+      console.log('Debug - Controller received ticket data:', JSON.stringify(ticketData, null, 2));
+      console.log('Debug - Cell value in controller:', ticketData.cell);
+      console.log('Debug - Cell type in controller:', typeof ticketData.cell);
+      
       // Validate required fields
       if (!ticketData.ticketId || !ticketData.title) {
         return res.status(400).json({
@@ -66,6 +71,8 @@ class TicketsController {
       // Add timestamp
       ticketData.createdAt = new Date().toISOString();
       ticketData.updatedAt = new Date().toISOString();
+      
+      console.log('Debug - Ticket data before sending to Excel service:', JSON.stringify(ticketData, null, 2));
       
       const success = excelService.createTicket(ticketData);
       
