@@ -1,203 +1,182 @@
 # Test Management System
 
-A comprehensive test management system for managing test cases, cell types, and site configurations with dynamic driveway management.
+A comprehensive test management system for cell testing with Excel integration, built with React frontend and Node.js backend.
 
-## Features
+## 🚀 Quick Start
 
-- **Test Case Management**: Create, update, and delete test cases with dynamic cell type support
-- **Site Configuration**: Configure sites with multiple cell types and phases
-- **Dynamic Driveway Management**: Support for multi-driveway cell types with configurable driveway counts
-- **Real-time Status Tracking**: Track test execution status across different sites and phases
-- **Searchable Dropdowns**: Enhanced UI with searchable site and cell type selectors
-- **Excel Integration**: Direct integration with Excel files for data persistence
+### One-Command Setup
 
-## Project Structure
+**For macOS/Linux:**
+```bash
+git clone <repository-url>
+cd test-management-system
+./setup.sh
+./start-system.sh
+```
+
+**For Windows:**
+```cmd
+git clone <repository-url>
+cd test-management-system
+setup.bat
+start-system.bat
+```
+
+### Access the Application
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:3005
+
+## ✨ Features
+
+- **Test Case Management**: Create, edit, and manage test cases
+- **Site Configuration**: Configure sites, phases, and cell types
+- **Test Execution**: Execute tests and track status
+- **Ticket Management**: Create and manage tickets with cell information
+- **Dashboard**: View test statistics and progress
+- **Excel Integration**: Full Excel file integration for data persistence
+- **Real-time Updates**: Live status updates and notifications
+
+## 🛠️ System Requirements
+
+- **Node.js**: Version 18.0.0 or higher
+- **npm**: Version 8.0.0 or higher
+- **Git**: For version control
+- **Operating System**: Windows 10+, macOS 10.15+, or Linux (Ubuntu 18.04+)
+
+## 📁 Project Structure
 
 ```
 test-management-system/
-├── backend/                 # Node.js/Express backend
-│   ├── data/               # Excel data files
-│   ├── src/
+├── backend/                 # Node.js backend
+│   ├── src/                # Source code
 │   │   ├── controllers/    # API controllers
+│   │   ├── services/       # Business logic
 │   │   ├── routes/         # API routes
-│   │   ├── services/       # Business logic services
 │   │   └── middleware/     # Express middleware
-│   └── server.js           # Main server file
+│   ├── data/               # Excel data files
+│   └── package.json        # Backend dependencies
 ├── frontend/               # React frontend
-│   ├── src/
+│   ├── src/                # Source code
 │   │   ├── components/     # React components
-│   │   ├── services/       # API service layer
-│   │   └── App.js          # Main app component
-│   └── public/             # Static assets
-└── README.md               # This file
+│   │   ├── services/       # API services
+│   │   └── hooks/          # Custom React hooks
+│   └── package.json        # Frontend dependencies
+├── setup.sh               # macOS/Linux setup script
+├── setup.bat              # Windows setup script
+├── start-system.sh        # Start both servers (macOS/Linux)
+├── start-system.bat       # Start both servers (Windows)
+└── package.json           # Root package configuration
 ```
 
-## Quick Start
+## 🎯 Available Scripts
 
-### Backend Setup
+### Setup & Installation
+- `./setup.sh` / `setup.bat` - Automated system setup
+- `npm run install-all` - Install all dependencies
+- `npm run setup` - Run setup script (macOS/Linux)
+- `npm run setup:win` - Run setup script (Windows)
 
-1. Navigate to the backend directory:
-   ```bash
-   cd backend
-   ```
+### Start/Stop System
+- `./start-system.sh` / `start-system.bat` - Start both servers
+- `./stop-system.sh` / `stop-system.bat` - Stop all servers
+- `npm run start:backend` - Start backend only
+- `npm run start:frontend` - Start frontend only
 
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+### Development
+- `npm run dev` - Start in development mode with hot reload
+- `npm run backend` - Start backend in development mode
+- `npm run frontend` - Start frontend in development mode
 
-3. Start the server:
-   ```bash
-   npm start
-   ```
+### Utilities
+- `npm run clean` - Clean node_modules (macOS/Linux)
+- `npm run clean:win` - Clean node_modules (Windows)
+- `npm run reset` - Clean and reinstall everything
+- `npm run backup` - Create data backup
+- `npm run check-ports` - Check if ports are available
+- `npm run kill-ports` - Kill processes on ports 3000 and 3005
 
-   **Alternative**: Use the provided startup scripts:
-   - **macOS/Linux**: `./start-backend.sh`
-   - **Windows**: `start-backend.bat`
+## 🔧 Configuration
 
-The backend will run on `http://localhost:3005`
-
-### Frontend Setup
-
-1. Navigate to the frontend directory:
-   ```bash
-   cd frontend
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Start the development server:
-   ```bash
-   npm start
-   ```
-
-The frontend will run on `http://localhost:3000`
-
-## Troubleshooting
-
-### Image Upload Issues
-
-If you encounter "Error uploading image: Load failed" or similar errors:
-
-1. **Ensure Backend is Running**: The backend server must be running for image uploads to work
-   ```bash
-   # Check if backend is running
-   curl http://localhost:3005/api/health
-   ```
-
-2. **Start Backend Server**: If the backend is not running, start it:
-   ```bash
-   # Option 1: Manual start
-   cd backend && npm start
-   
-   # Option 2: Use startup script
-   ./start-backend.sh  # macOS/Linux
-   start-backend.bat   # Windows
-   ```
-
-3. **Check Network**: Ensure the frontend can reach `http://localhost:3005`
-
-4. **File Permissions**: Ensure the `backend/data/images` and `backend/data/temp` directories exist and are writable
-
-### Common Issues
-
-- **"Backend server is not running"**: Start the backend server first
-- **"Network error"**: Check if the backend is accessible at `http://localhost:3005`
-- **"File size too large"**: Images are limited to 10MB
-- **"Invalid file type"**: Only image files (PNG, JPG, GIF) are supported
-
-## API Endpoints
-
-### Test Cases
-- `GET /api/test-cases` - Get all test cases
-- `GET /api/test-cases/site/:site` - Get test cases for a specific site
-- `POST /api/test-cases` - Create a new test case
-- `PUT /api/test-cases/:id` - Update a test case
-- `DELETE /api/test-cases/:id` - Delete a test case
-
-### Site Configuration
-- `GET /api/setup/site-options` - Get available site options
-- `POST /api/setup/site` - Create site configuration
-- `GET /api/setup/sites` - Get all configured sites
-
-### Test Status
-- `GET /api/test-status` - Get test status data
-- `PUT /api/test-status` - Update test status
-
-### Cell Types
-- `GET /api/cell-types` - Get all cell types
-- `POST /api/cell-types` - Create a new cell type
-- `PUT /api/cell-types/:cellType` - Update a cell type
-- `DELETE /api/cell-types/:cellType` - Delete a cell type
-
-## Key Features
-
-### Dynamic Driveway Management
-- Support for multi-driveway cell types (e.g., FLIB with 2 driveways, gah with 4 driveways)
-- Automatic driveway configuration based on cell type settings
-- Dynamic UI that adapts to the number of driveways
-
-### Test Case Creation
-- Automatic creation of test status entries for all sites when a new test case is created
-- Support for different scopes (Cell, System, Safety, Hardening, Rate)
-- Integration with cell type configurations
-
-### Site Management
-- Searchable site dropdown with keyboard navigation
-- Support for multiple phases per site
-- Automatic test case generation for configured cell types
-
-## Data Files
-
+### Excel Files
 The system uses Excel files for data persistence:
-
-- `cell_types.xlsx` - Cell type configurations and driveway settings
-- `site_info.xlsx` - Site information (City, State, DC Number)
 - `test_cases.xlsx` - Test case definitions
-- `test_status.xlsx` - Test execution status and results
+- `cell_types.xlsx` - Cell type configurations
+- `site_info.xlsx` - Site information
+- `test_status.xlsx` - Test execution status
+- `tickets.xlsx` - Ticket management
+- `ui_changes_log.xlsx` - UI change logging
 
-## Development
+### API Endpoints
+- `GET /api/test-cases` - Get all test cases
+- `GET /api/test-status` - Get test status
+- `GET /api/site-info` - Get site information
+- `GET /api/tickets` - Get tickets
+- `POST /api/setup/site` - Create site configuration
 
-### Code Structure
-- **Controllers**: Handle HTTP requests and responses
-- **Services**: Business logic and data access
-- **Routes**: API endpoint definitions
-- **Components**: React UI components
-
-### Adding New Features
-1. Create/update the appropriate controller method
-2. Add the route in the routes file
-3. Update the frontend API service if needed
-4. Create/update React components for the UI
-
-## Troubleshooting
+## 🚨 Troubleshooting
 
 ### Common Issues
 
-1. **"Error loading site options"**: 
-   - Ensure the backend server is running on port 3005
-   - Check that `site_info.xlsx` exists and has data
-   - Clear browser cache and refresh
+#### Port Already in Use
+```bash
+# Check ports
+npm run check-ports
 
-2. **Test cases not appearing**:
-   - Verify that test cases exist in `test_cases.xlsx`
-   - Check that corresponding entries exist in `test_status.xlsx`
-   - Ensure the site is properly configured
+# Kill processes
+npm run kill-ports
+```
 
-3. **Driveway configuration issues**:
-   - Verify cell type settings in `cell_types.xlsx`
-   - Check that `hasMultipleDriveways` and `numberOfDriveways` are set correctly
+#### Permission Issues (macOS/Linux)
+```bash
+chmod +x *.sh
+```
 
-## Contributing
+#### Dependencies Issues
+```bash
+npm run reset
+```
 
-1. Follow the existing code structure
-2. Add appropriate error handling
-3. Update documentation for new features
-4. Test thoroughly before submitting changes
+#### Excel Files Missing
+```bash
+# Run setup again
+./setup.sh
+```
 
-## License
+### Getting Help
+1. Check console logs for error messages
+2. Verify system requirements are met
+3. Try `npm run reset` to clean and reinstall
+4. Create an issue with:
+   - OS and version
+   - Node.js and npm versions
+   - Complete error messages
 
-This project is proprietary and confidential. 
+## 📚 Documentation
+
+- [Installation Guide](INSTALLATION_GUIDE.md) - Detailed installation instructions
+- [User Manual](SETUP_README.md) - Complete usage guide
+- [API Documentation](backend/README.md) - Backend API reference
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🆘 Support
+
+For support and questions:
+1. Check the troubleshooting section
+2. Review the documentation
+3. Create an issue in the repository
+4. Contact the development team
+
+---
+
+**Made with ❤️ for efficient test management**
