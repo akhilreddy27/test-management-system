@@ -124,4 +124,3 @@ config.local.js
 
 # Documentation files
 *.md
-!CODE_CLEANUP_SUMMARY.md
