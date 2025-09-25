@@ -121,3 +121,7 @@ coverage/
 # Local configuration files
 config.local.js
 .env.local
+
+# Documentation files
+*.md
+!CODE_CLEANUP_SUMMARY.md
